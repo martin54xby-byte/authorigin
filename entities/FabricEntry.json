@@ -1,0 +1,68 @@
+{
+  "type": "object",
+  "properties": {
+    "hash": {
+      "type": "string",
+      "description": "SHA-256 of this entry"
+    },
+    "parent_hash": {
+      "type": "string",
+      "description": "Previous chain link \u2014 null for genesis"
+    },
+    "om_id": {
+      "type": "string",
+      "description": "Bound ObjectiveMolecule"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Execution session"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "input",
+        "collapse",
+        "execution",
+        "render",
+        "rejection",
+        "violation"
+      ],
+      "description": "Fabric event classification"
+    },
+    "payload_hash": {
+      "type": "string",
+      "description": "Hash of associated payload"
+    },
+    "payload_summary": {
+      "type": "string",
+      "description": "Human-readable summary of what happened"
+    },
+    "invariant_check": {
+      "type": "object",
+      "properties": {
+        "singularity": {
+          "type": "boolean"
+        },
+        "no_orphan_execution": {
+          "type": "boolean"
+        },
+        "no_representation_without_collapse": {
+          "type": "boolean"
+        },
+        "no_speculative_features": {
+          "type": "boolean"
+        }
+      },
+      "description": "Invariant state at this event"
+    },
+    "timestamp_ms": {
+      "type": "number",
+      "description": "Unix ms timestamp"
+    }
+  },
+  "required": [
+    "event_type",
+    "om_id"
+  ],
+  "name": "FabricEntry"
+}

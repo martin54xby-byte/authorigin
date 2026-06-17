@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "properties": {
+    "raw_text": {
+      "type": "string",
+      "description": "Unprocessed user intent \u2014 no semantics resolved"
+    },
+    "context_state": {
+      "type": "object",
+      "description": "Ambient context at time of capture"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Session identifier"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "captured",
+        "processing",
+        "collapsed",
+        "rejected"
+      ],
+      "description": "Pipeline stage"
+    }
+  },
+  "required": [
+    "raw_text"
+  ],
+  "name": "AuthInput"
+}

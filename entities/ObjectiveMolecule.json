@@ -1,0 +1,82 @@
+{
+  "type": "object",
+  "properties": {
+    "om_id": {
+      "type": "string",
+      "description": "Canonical identifier"
+    },
+    "auth_input_id": {
+      "type": "string",
+      "description": "Source AuthInput reference"
+    },
+    "singular_goal": {
+      "type": "string",
+      "description": "Exactly one collapsed intent"
+    },
+    "success_condition": {
+      "type": "string",
+      "description": "Measurable completion state"
+    },
+    "exclusion_conditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Explicitly excluded interpretations"
+    },
+    "constraint_set": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "hard",
+              "soft"
+            ]
+          },
+          "rule": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Execution boundary constraints"
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Collapse confidence 0\u20131"
+    },
+    "lineage_hash": {
+      "type": "string",
+      "description": "Cryptographic chain to AuthInput"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "proposed",
+        "active",
+        "rejected",
+        "superseded"
+      ],
+      "description": "Pipeline state \u2014 immutable once active"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "description": "Why this OM was discarded by CCE"
+    },
+    "candidate_siblings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Other OM IDs considered in same CCE run"
+    }
+  },
+  "required": [
+    "singular_goal",
+    "success_condition",
+    "status"
+  ],
+  "name": "ObjectiveMolecule"
+}

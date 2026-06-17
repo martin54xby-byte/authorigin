@@ -1,0 +1,93 @@
+{
+  "type": "object",
+  "properties": {
+    "eg_id": {
+      "type": "string",
+      "description": "Graph identifier"
+    },
+    "om_id": {
+      "type": "string",
+      "description": "Bound ObjectiveMolecule \u2014 required"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "action_type": {
+            "type": "string",
+            "enum": [
+              "compute",
+              "retrieve",
+              "transform",
+              "render"
+            ]
+          },
+          "input_schema": {
+            "type": "object"
+          },
+          "output_schema": {
+            "type": "object"
+          },
+          "origin_reference": {
+            "type": "string",
+            "description": "MUST match om_id"
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "description": "All allowed execution steps"
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Directed execution dependencies"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "building",
+        "valid",
+        "executing",
+        "complete",
+        "pruned"
+      ]
+    },
+    "validation_errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Invariant violations detected"
+    }
+  },
+  "required": [
+    "om_id",
+    "status"
+  ],
+  "name": "ExecutionGraph"
+}

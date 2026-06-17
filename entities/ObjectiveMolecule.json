@@ -53,11 +53,10 @@
                 "type": "string"
               }
             },
-            "description": "Atomic Constraint Form \u2014 CAR-1 decomposition"
+            "description": "Atomic Constraint Form \u2014 CAR-1"
           },
           "determinism_score": {
-            "type": "number",
-            "description": "0\u20131, must be 1.0 to pass CDC"
+            "type": "number"
           },
           "cdc_valid": {
             "type": "boolean"
@@ -94,20 +93,38 @@
       "description": "MOCL-1: sealed causal domain ID"
     },
     "ccc_valid": {
-      "type": "boolean",
-      "description": "Collapse Completeness Condition"
+      "type": "boolean"
     },
     "car_valid": {
-      "type": "boolean",
-      "description": "CAR-1: all constraints pass CDC"
+      "type": "boolean"
     },
     "execution_manifold_id": {
       "type": "string",
-      "description": "CGS-1: bound execution manifold"
+      "description": "CGS-1"
     },
     "version": {
       "type": "integer",
-      "description": "Temporal coherence version counter"
+      "description": "Monotonic version counter \u2014 TCL-1"
+    },
+    "singular_goal_hash": {
+      "type": "string",
+      "description": "TCL-1: hash of singular_goal, must be stable for same om_id"
+    },
+    "execution_graph_hash": {
+      "type": "string",
+      "description": "TCL-1: hash of last execution graph \u2014 TCI comparison baseline"
+    },
+    "temporal_spine_id": {
+      "type": "string",
+      "description": "TCL-1: ID of first FabricTimeChain entry for this OM"
+    },
+    "superseded_by": {
+      "type": "string",
+      "description": "om_id of successor OM if this one was superseded"
+    },
+    "tci_holds": {
+      "type": "boolean",
+      "description": "TCL-1: Temporal Coherence Invariant \u2014 false means drift detected"
     }
   },
   "required": [

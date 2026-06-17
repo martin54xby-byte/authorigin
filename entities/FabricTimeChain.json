@@ -1,0 +1,77 @@
+{
+  "type": "object",
+  "properties": {
+    "om_id": {
+      "type": "string",
+      "description": "The OM this entry belongs to \u2014 temporal spine key"
+    },
+    "timestamp_ms": {
+      "type": "number",
+      "description": "Unix ms \u2014 monotonically increasing per OM"
+    },
+    "collapse_hash": {
+      "type": "string",
+      "description": "SHA-256 of the OM at this point in time"
+    },
+    "execution_graph_hash": {
+      "type": "string",
+      "description": "SHA-256 of the execution graph produced at this time"
+    },
+    "constraint_hash": {
+      "type": "string",
+      "description": "CAR-1 constraint set hash \u2014 must be stable across versions"
+    },
+    "singular_goal_hash": {
+      "type": "string",
+      "description": "SHA-256 of singular_goal \u2014 must never change for same om_id"
+    },
+    "previous_hash": {
+      "type": "string",
+      "description": "Previous FabricTimeChain entry hash \u2014 null for first collapse"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "collapse",
+        "execution",
+        "supersession",
+        "replay",
+        "drift_violation"
+      ],
+      "description": "TCL-1 temporal event type"
+    },
+    "version": {
+      "type": "integer",
+      "description": "Monotonic version counter for this OM"
+    },
+    "drift_score": {
+      "type": "number",
+      "description": "0 = identical to prior execution, >0 = drift detected"
+    },
+    "tci_holds": {
+      "type": "boolean",
+      "description": "Temporal Coherence Invariant \u2014 false if drift_score > 0 on non-superseded OM"
+    },
+    "lineage_hash": {
+      "type": "string",
+      "description": "Must match OM.lineage_hash \u2014 binds temporal chain to causal chain"
+    },
+    "replay_valid": {
+      "type": "boolean",
+      "description": "True if this is a replay that produced identical execution graph"
+    },
+    "superseded_by": {
+      "type": "string",
+      "description": "om_id of successor if this is a supersession event"
+    },
+    "session_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "om_id",
+    "event_type",
+    "tci_holds"
+  ],
+  "name": "FabricTimeChain"
+}

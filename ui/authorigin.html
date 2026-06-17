@@ -822,7 +822,7 @@
 
   .gs-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 0;
   }
 
@@ -831,8 +831,8 @@
     border-right: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
   }
-  .gs-cell:nth-child(2n) { border-right: none; }
-  .gs-cell:nth-last-child(-n+2) { border-bottom: none; }
+  .gs-cell:nth-child(3n) { border-right: none; }
+  .gs-cell:nth-last-child(-n+3) { border-bottom: none; }
 
   .gs-layer { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 4px; }
   .gs-holds { font-size: 20px; font-weight: 900; margin-bottom: 4px; }
@@ -933,15 +933,20 @@
           <span class="stage-name">CGS-1 Manifold</span>
           <span class="stage-tag text-dim mono" style="font-size:9px">06</span>
         </div>
+        <div class="stage-item" data-stage="tcl1">
+          <div class="stage-dot" id="dot-tcl1"></div>
+          <span class="stage-name">TCL-1 Temporal</span>
+          <span class="stage-tag text-dim mono" style="font-size:9px">07</span>
+        </div>
         <div class="stage-item" data-stage="ui">
           <div class="stage-dot" id="dot-ui"></div>
           <span class="stage-name">UI Materialisation</span>
-          <span class="stage-tag text-dim mono" style="font-size:9px">07</span>
+          <span class="stage-tag text-dim mono" style="font-size:9px">08</span>
         </div>
         <div class="stage-item" data-stage="fabric">
           <div class="stage-dot" id="dot-fabric"></div>
           <span class="stage-name">origin.fabric</span>
-          <span class="stage-tag text-dim mono" style="font-size:9px">08</span>
+          <span class="stage-tag text-dim mono" style="font-size:9px">09</span>
         </div>
         <div class="stage-item" data-stage="guarantees">
           <div class="stage-dot" id="dot-guarantees"></div>
@@ -975,6 +980,11 @@
           <span class="g-label">MOCL-1</span>
           <div class="g-bar-track"><div class="g-bar-fill" id="gbar-mocl" style="background:var(--amber)"></div></div>
           <span class="g-status pend" id="gstat-mocl">—</span>
+        </div>
+        <div class="g-row">
+          <span class="g-label">TCL-1</span>
+          <div class="g-bar-track"><div class="g-bar-fill" id="gbar-tcl1" style="background:#c084fc"></div></div>
+          <span class="g-status pend" id="gstat-tcl1">—</span>
         </div>
       </div>
     </div>
@@ -1077,8 +1087,8 @@ async function runPipeline() {
   // Reset UI
   const pipeline = document.getElementById('pipeline');
   pipeline.innerHTML = '';
-  ['authinput','opl','cce','car1','graph','cgs1','ui','fabric','guarantees'].forEach(s => setDot(s, ''));
-  ['fr0','car1','cgs1','mocl'].forEach(k => {
+  ['authinput','opl','cce','car1','graph','cgs1','tcl1','ui','fabric','guarantees'].forEach(s => setDot(s, ''));
+  ['fr0','car1','cgs1','mocl','tcl1'].forEach(k => {
     const bar = document.getElementById('gbar-' + k);
     const stat = document.getElementById('gstat-' + k);
     if (bar) { bar.style.width = '0%'; }
@@ -1126,6 +1136,16 @@ async function runPipeline() {
     return;
   }
 
+  if (data.status === 'blocked_temporal_drift') {
+    const oplSt = data.pipeline_stages?.find(s => s.stage === 'OPL');
+    setDot('opl', 'done'); appendCard('opl', renderOPL(oplSt?.candidates || [], null));
+    setDot('cce', 'done'); appendCard('cce', renderCCE(data));
+    setDot('car1', 'done'); appendCard('car1', renderCAR1(data.pipeline_stages?.find(s=>s.stage==='CAR1')?.car_result || {cdc_holds:true,processed_constraints:[],failed_constraints:[],elastic_constraints_detected:[],constraint_hash:'',allowed_state_set_hash:''}, false));
+    setDot('tcl1', 'error');
+    appendCard('tcl1', renderTCL1Blocked(data));
+    btn.disabled = false; btn.textContent = 'Collapse →'; return;
+  }
+
   if (data.status === 'blocked_elastic_constraints') {
     setDot('opl', 'done');
     appendCard('opl', renderOPL(data.pipeline_stages?.find(s=>s.stage==='OPL')?.candidates || [], data.active_om?.singular_goal));
@@ -1162,6 +1182,12 @@ async function runPipeline() {
   setDot('cgs1', data.cgs_result?.pet_holds ? 'done' : 'error');
   appendCard('cgs1', renderCGS1(data.cgs_result));
   if (data.formal_guarantees?.CGS1) setGuarantee('cgs1', data.formal_guarantees.CGS1.holds);
+
+  // TCL-1
+  const tclStage = data.pipeline_stages?.find(s => s.stage === 'TCL1_TemporalCoherence');
+  setDot('tcl1', data.tcl_result?.tci_holds ? 'done' : 'error');
+  appendCard('tcl1', renderTCL1(data.tcl_result, tclStage));
+  if (data.formal_guarantees?.TCL1) setGuarantee('tcl1', data.formal_guarantees.TCL1.holds);
 
   // UI Materialisation
   setDot('ui', 'done');
@@ -1690,6 +1716,107 @@ function renderFabric(chain) {
   </div>`;
 }
 
+function renderTCL1(tcl, stage) {
+  if (!tcl) return '';
+  const ok = tcl.tci_holds;
+  const evtColors = {
+    first_collapse: 'var(--accent)', replay: 'var(--green)',
+    versioned_recollapse: 'var(--blue)', drift_violation: 'var(--red)', supersession: 'var(--amber)'
+  };
+  const evtColor = evtColors[tcl.event_type] || 'var(--text-dim)';
+  const prevHash = tcl.previous_graph_hash;
+  const currHash = tcl.current_graph_hash;
+  const driftItems = (tcl.drift_details || []).map(d => `<li style="color:var(--red);font-size:11px;margin-top:4px">${esc(d)}</li>`).join('');
+  const violItems = (tcl.violations || []).map(v => `<li style="color:var(--red);font-size:11px;margin-top:4px;font-weight:600">${esc(v)}</li>`).join('');
+  const timelineRows = [
+    prevHash ? `<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:9px;color:var(--text-dim);width:80px;text-transform:uppercase;letter-spacing:.5px">Prior graph</span><span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">${prevHash.slice(0,24)}…</span>${prevHash===currHash?'<span style="font-size:10px;color:var(--green);margin-left:auto">≡ identical</span>':'<span style="font-size:10px;color:var(--red);margin-left:auto">≠ diverged</span>'}</div>` : '',
+    `<div style="display:flex;gap:10px;align-items:center;padding:8px 0"><span style="font-size:9px;color:var(--text-dim);width:80px;text-transform:uppercase;letter-spacing:.5px">This graph</span><span style="font-family:var(--mono);font-size:10px;color:var(--accent)">${currHash.slice(0,24)}…</span><span style="font-size:10px;margin-left:auto" style="color:${evtColor}">v${tcl.version}</span></div>`
+  ].filter(Boolean).join('');
+
+  return `<div class="stage-card ${ok?'done':'error'}">
+    <div class="card-header">
+      <div class="card-icon ${ok?'icon-blue':'icon-red'}">⏱</div>
+      <div>
+        <div class="card-title">TCL-1 — Temporal Coherence Layer</div>
+        <div class="card-subtitle">TCI: OM identity stable across time — drift detection + temporal spine</div>
+      </div>
+      <div class="card-status-badge ${ok?'sb-done':'sb-error'}">${ok?`TCI Holds (v${tcl.version})`:'Drift Detected'}</div>
+    </div>
+    <div class="card-body">
+      <div class="meta-row" style="margin-bottom:16px">
+        <div class="meta-item">
+          <span class="meta-key">Event Type</span>
+          <span class="meta-val" style="color:${evtColor};font-weight:700">${esc(tcl.event_type||'—')}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-key">Version</span>
+          <span class="meta-val mono">${tcl.version || 1}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-key">Drift Score</span>
+          <span class="meta-val mono ${tcl.drift_score > 0 ? 'text-red' : 'text-green'}">${tcl.drift_score || 0}</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-key">Replay Valid</span>
+          <span class="meta-val ${tcl.replay_valid?'text-green':'text-dim'}">${tcl.replay_valid ? '✓ yes' : '—'}</span>
+        </div>
+      </div>
+
+      <div class="section-title">Execution Graph Hash Timeline</div>
+      <div style="background:var(--surface2);border:1px solid var(--border-hi);border-radius:6px;padding:12px 14px;margin-bottom:16px">
+        ${timelineRows}
+      </div>
+
+      ${tcl.event_type === 'first_collapse' ? `<div style="background:var(--accent-glow);border:1px solid var(--accent-dim);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--accent)">
+        ⊕ Genesis entry — first collapse of this OM. FabricTimeChain spine created. Future runs will be compared against this graph hash.
+      </div>` : ''}
+
+      ${tcl.event_type === 'replay' ? `<div style="background:var(--green-dim);border:1px solid var(--green);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--green)">
+        ✓ Replay — execution graph is identical to prior run. TCI holds. Reproducibility confirmed.
+      </div>` : ''}
+
+      ${tcl.event_type === 'versioned_recollapse' ? `<div style="background:var(--blue-dim);border:1px solid var(--blue);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--blue)">
+        ↻ Versioned re-collapse — same lineage, same singular_goal, incremented version. TCI holds.
+      </div>` : ''}
+
+      ${!ok ? `<div style="margin-top:12px">
+        <div class="section-title">Violations</div>
+        <ul style="list-style:none;padding:0">${violItems}</ul>
+        ${driftItems ? `<div class="section-title" style="margin-top:10px">Drift Details</div><ul style="list-style:none;padding:0">${driftItems}</ul>` : ''}
+        ${tcl.supersession_required ? `<div style="background:var(--amber-dim);border:1px solid var(--amber);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--amber);margin-top:12px">⚠ Supersession required — submit without om_id_replay to create a fresh OM with a new ID and lineage</div>` : ''}
+      </div>` : ''}
+
+      <div style="margin-top:14px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border-hi);border-radius:6px;font-size:10px;color:var(--text-dim)">
+        <strong style="color:var(--text-mid)">TCI theorem:</strong> ∀ t1,t2: if OM(t1).id = OM(t2).id ∧ status ≠ superseded → ExecGraph(t1) ≡ ExecGraph(t2)<br>
+        <strong style="color:var(--text-mid)">Allowed evolutions:</strong> supersession (new ID) · versioned_recollapse (same lineage) · replay (identical output)<br>
+        <strong style="color:var(--red)">Forbidden:</strong> silent semantic mutation · lazy re-collapse divergence · partial patch evolution
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderTCL1Blocked(data) {
+  const tcl = data.tcl_result || {};
+  return `<div class="stage-card error">
+    <div class="card-header">
+      <div class="card-icon icon-red">⏱</div>
+      <div><div class="card-title">TCL-1 — Temporal Drift Detected</div><div class="card-subtitle">TCI violated — execution blocked</div></div>
+      <div class="card-status-badge sb-error">Drift Blocked</div>
+    </div>
+    <div class="card-body">
+      <div class="block-panel">
+        <div class="block-title">⚠ Temporal coherence violation (drift_score=${tcl.drift_score || 0})</div>
+        <div class="block-msg">${esc(data.message || 'OM has diverged from its prior execution graph without supersession.')}</div>
+        ${data.resolution ? `<div class="block-question" style="margin-top:12px">
+          <strong>Option 1:</strong> ${esc(data.resolution.option_1)}<br>
+          <strong>Option 2:</strong> ${esc(data.resolution.option_2)}
+        </div>` : ''}
+      </div>
+      ${(tcl.violations||[]).length ? `<div style="margin-top:12px"><ul style="list-style:none;padding:0">${(tcl.violations||[]).map(v=>`<li style="color:var(--red);font-size:11px;font-weight:600;margin-top:4px">${esc(v)}</li>`).join('')}</ul></div>` : ''}
+    </div>
+  </div>`;
+}
+
 function renderGuarantees(fg) {
   if (!fg) return '';
 
@@ -1698,6 +1825,7 @@ function renderGuarantees(fg) {
     { key: 'CAR1', name: 'CAR-1', color: 'var(--accent)', bg: 'var(--accent-dim)', subtitle: 'Constraint Determinism' },
     { key: 'CGS1', name: 'CGS-1', color: 'var(--blue)',   bg: 'var(--blue-dim)',   subtitle: 'Outcome Invariance' },
     { key: 'MOCL1',name: 'MOCL-1',color: 'var(--amber)',  bg: 'var(--amber-dim)',  subtitle: 'OM Isolation' },
+    { key: 'TCL1', name: 'TCL-1', color: '#c084fc',       bg: 'rgba(192,132,252,.15)', subtitle: 'Temporal Coherence' },
   ];
 
   const cells = layers.map(l => {

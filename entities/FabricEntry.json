@@ -24,7 +24,11 @@
         "violation",
         "car_check",
         "cgs_path",
-        "mocl_mediation"
+        "mocl_mediation",
+        "tcl_check",
+        "drift_violation",
+        "supersession",
+        "replay"
       ]
     },
     "payload_hash": {
@@ -49,16 +53,17 @@
           "type": "boolean"
         },
         "cdc_holds": {
-          "type": "boolean",
-          "description": "CAR-1: Constraint Determinism Condition"
+          "type": "boolean"
         },
         "pet_holds": {
-          "type": "boolean",
-          "description": "CGS-1: Path Equivalence Test"
+          "type": "boolean"
         },
         "mocl_isolation_holds": {
+          "type": "boolean"
+        },
+        "tci_holds": {
           "type": "boolean",
-          "description": "MOCL-1: no cross-OM contamination"
+          "description": "TCL-1: Temporal Coherence Invariant"
         }
       }
     },
@@ -80,8 +85,7 @@
             "type": "string"
           }
         }
-      },
-      "description": "CAR-1 fabric extension"
+      }
     },
     "cgs_layer": {
       "type": "object",
@@ -98,8 +102,7 @@
         "path_variance": {
           "type": "number"
         }
-      },
-      "description": "CGS-1 fabric extension"
+      }
     },
     "mocl_layer": {
       "type": "object",
@@ -116,8 +119,44 @@
         "omm_mediated": {
           "type": "boolean"
         }
-      },
-      "description": "MOCL-1 fabric extension"
+      }
+    },
+    "tcl_layer": {
+      "type": "object",
+      "description": "TCL-1 fabric extension",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "drift_score": {
+          "type": "number"
+        },
+        "tci_holds": {
+          "type": "boolean"
+        },
+        "execution_graph_hash": {
+          "type": "string"
+        },
+        "previous_graph_hash": {
+          "type": "string"
+        },
+        "singular_goal_hash": {
+          "type": "string"
+        },
+        "replay_valid": {
+          "type": "boolean"
+        },
+        "event_type": {
+          "type": "string",
+          "enum": [
+            "collapse",
+            "execution",
+            "supersession",
+            "replay",
+            "drift_violation"
+          ]
+        }
+      }
     },
     "timestamp_ms": {
       "type": "number"

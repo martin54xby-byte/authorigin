@@ -28,7 +28,9 @@
         "tcl_check",
         "drift_violation",
         "supersession",
-        "replay"
+        "replay",
+        "eel_policy",
+        "eel_rejection"
       ]
     },
     "payload_hash": {
@@ -62,8 +64,11 @@
           "type": "boolean"
         },
         "tci_holds": {
+          "type": "boolean"
+        },
+        "eel_valid": {
           "type": "boolean",
-          "description": "TCL-1: Temporal Coherence Invariant"
+          "description": "EEL-1: policy outcome matches OM outcome"
         }
       }
     },
@@ -123,7 +128,6 @@
     },
     "tcl_layer": {
       "type": "object",
-      "description": "TCL-1 fabric extension",
       "properties": {
         "version": {
           "type": "integer"
@@ -147,14 +151,37 @@
           "type": "boolean"
         },
         "event_type": {
-          "type": "string",
-          "enum": [
-            "collapse",
-            "execution",
-            "supersession",
-            "replay",
-            "drift_violation"
-          ]
+          "type": "string"
+        }
+      }
+    },
+    "eel_layer": {
+      "type": "object",
+      "description": "EEL-1 fabric extension \u2014 learning spine entry",
+      "properties": {
+        "pm_id": {
+          "type": "string"
+        },
+        "pm_version": {
+          "type": "integer"
+        },
+        "learning_source": {
+          "type": "string"
+        },
+        "outcome_invariant": {
+          "type": "boolean"
+        },
+        "efficiency_delta": {
+          "type": "number"
+        },
+        "strategy_hash": {
+          "type": "string"
+        },
+        "prior_pm_id": {
+          "type": "string"
+        },
+        "eel_valid": {
+          "type": "boolean"
         }
       }
     },

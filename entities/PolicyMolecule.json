@@ -1,0 +1,142 @@
+{
+  "type": "object",
+  "properties": {
+    "pm_id": {
+      "type": "string",
+      "description": "Unique policy identifier"
+    },
+    "om_id": {
+      "type": "string",
+      "description": "Bound ObjectiveMolecule \u2014 immutable reference"
+    },
+    "version": {
+      "type": "integer",
+      "description": "Monotonic policy version counter"
+    },
+    "strategy": {
+      "type": "object",
+      "description": "Execution strategy \u2014 the ONLY mutable layer",
+      "properties": {
+        "approach": {
+          "type": "string",
+          "description": "High-level execution approach"
+        },
+        "node_ordering": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Preferred node execution sequence"
+        },
+        "optimisation_focus": {
+          "type": "string",
+          "enum": [
+            "latency",
+            "throughput",
+            "cost",
+            "reliability"
+          ],
+          "description": "What dimension is being optimised"
+        },
+        "pruned_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Execution paths eliminated as inefficient"
+        },
+        "preferred_algorithms": {
+          "type": "object",
+          "description": "Node-level algorithm choices"
+        }
+      }
+    },
+    "performance_metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "metric": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "lower_is_better",
+              "higher_is_better"
+            ]
+          }
+        }
+      },
+      "description": "Measured performance of this policy version"
+    },
+    "outcome_hash": {
+      "type": "string",
+      "description": "Must match OM canonical outcome \u2014 invariant check"
+    },
+    "om_outcome_hash": {
+      "type": "string",
+      "description": "Reference outcome hash from OM \u2014 PM must match this"
+    },
+    "eel_valid": {
+      "type": "boolean",
+      "description": "EEL-1: outcome(PM_n+1) == outcome(PM_n) AND cost(n+1) < cost(n)"
+    },
+    "efficiency_delta": {
+      "type": "number",
+      "description": "Cost improvement vs prior version \u2014 must be negative to be valid upgrade"
+    },
+    "prior_pm_id": {
+      "type": "string",
+      "description": "Previous PolicyMolecule this supersedes"
+    },
+    "prior_outcome_hash": {
+      "type": "string",
+      "description": "Outcome hash of prior PM \u2014 must be identical"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "proposed",
+        "active",
+        "superseded",
+        "rejected"
+      ],
+      "description": "Policy lifecycle state"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "description": "Why this PM was rejected by EEL validator"
+    },
+    "learning_source": {
+      "type": "string",
+      "enum": [
+        "execution_history",
+        "ai_proposal",
+        "manual_override",
+        "replay_analysis"
+      ],
+      "description": "What triggered this policy evolution"
+    },
+    "execution_count": {
+      "type": "integer",
+      "description": "How many times this policy has been executed"
+    },
+    "lineage_hash": {
+      "type": "string",
+      "description": "Hash chain linking back to OM lineage"
+    }
+  },
+  "required": [
+    "om_id",
+    "status",
+    "eel_valid"
+  ],
+  "name": "PolicyMolecule"
+}

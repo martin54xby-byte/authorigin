@@ -2,27 +2,22 @@
   "type": "object",
   "properties": {
     "om_id": {
-      "type": "string",
-      "description": "Canonical identifier"
+      "type": "string"
     },
     "auth_input_id": {
-      "type": "string",
-      "description": "Source AuthInput reference"
+      "type": "string"
     },
     "singular_goal": {
-      "type": "string",
-      "description": "Exactly one collapsed intent"
+      "type": "string"
     },
     "success_condition": {
-      "type": "string",
-      "description": "Measurable completion state"
+      "type": "string"
     },
     "exclusion_conditions": {
       "type": "array",
       "items": {
         "type": "string"
-      },
-      "description": "Explicitly excluded interpretations"
+      }
     },
     "constraint_set": {
       "type": "array",
@@ -38,18 +33,43 @@
           },
           "rule": {
             "type": "string"
+          },
+          "acf": {
+            "type": "object",
+            "properties": {
+              "observable_condition": {
+                "type": "string"
+              },
+              "allowed_transition": {
+                "type": "string"
+              },
+              "forbidden_transitions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "verification_method": {
+                "type": "string"
+              }
+            },
+            "description": "Atomic Constraint Form \u2014 CAR-1 decomposition"
+          },
+          "determinism_score": {
+            "type": "number",
+            "description": "0\u20131, must be 1.0 to pass CDC"
+          },
+          "cdc_valid": {
+            "type": "boolean"
           }
         }
-      },
-      "description": "Execution boundary constraints"
+      }
     },
     "confidence": {
-      "type": "number",
-      "description": "Collapse confidence 0\u20131"
+      "type": "number"
     },
     "lineage_hash": {
-      "type": "string",
-      "description": "Cryptographic chain to AuthInput"
+      "type": "string"
     },
     "status": {
       "type": "string",
@@ -58,19 +78,36 @@
         "active",
         "rejected",
         "superseded"
-      ],
-      "description": "Pipeline state \u2014 immutable once active"
+      ]
     },
     "rejection_reason": {
-      "type": "string",
-      "description": "Why this OM was discarded by CCE"
+      "type": "string"
     },
     "candidate_siblings": {
       "type": "array",
       "items": {
         "type": "string"
-      },
-      "description": "Other OM IDs considered in same CCE run"
+      }
+    },
+    "isolation_domain_id": {
+      "type": "string",
+      "description": "MOCL-1: sealed causal domain ID"
+    },
+    "ccc_valid": {
+      "type": "boolean",
+      "description": "Collapse Completeness Condition"
+    },
+    "car_valid": {
+      "type": "boolean",
+      "description": "CAR-1: all constraints pass CDC"
+    },
+    "execution_manifold_id": {
+      "type": "string",
+      "description": "CGS-1: bound execution manifold"
+    },
+    "version": {
+      "type": "integer",
+      "description": "Temporal coherence version counter"
     }
   },
   "required": [

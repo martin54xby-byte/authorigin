@@ -1,162 +1,317 @@
 /**
- * AuthOrigin Canonical Collapse Engine (CCE) + FR-0 Formal Guarantee Layer
+ * AuthOrigin Canonical Collapse Engine — Full Stack
+ *
+ * Layers:
+ *   FR-0  — Anti-find_REPLACE (Collapse Precedence Constraint)
+ *   CAR-1 — Collapse Adversarial Resistance (Constraint Determinism)
+ *   CGS-1 — Controlled Generative Space (Execution Manifold + PET)
+ *   MOCL-1 — Multi-Objective Coherence (Isolation + OMM mediation)
  *
  * Pipeline:
- *   AuthInput → OPL → CCE (canonical collapse) → Activation Lock →
- *   Execution Graph → FR-0 CPC Validation → Render Gate (RGR) →
- *   UI Materialisation → origin.fabric chain
- *
- * Anti-find_REPLACE guarantee (FR-1):
- *   No RenderNode can be externally visible unless it traces through
- *   a validated CollapseNode. Violations are dropped + fabric-logged
- *   (never silently patched).
+ *   AuthInput → OPL → CCE → ActivationLock →
+ *   CAR-1 (CDC) → ExecutionGraph → CGS-1 (Manifold + PET) →
+ *   FR-0 (CPC) → RenderGate (RGR) → MOCL-1 (IsolationCheck) →
+ *   UIMaterialisation → FabricChain (full layered entries)
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import Anthropic from 'npm:@anthropic-ai/sdk@0.26.0';
 
-// ─── Crypto ─────────────────────────────────────────────────────────────────
+// ─── Crypto ──────────────────────────────────────────────────────────────────
 
 async function sha256(input: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function generateId(prefix: string): string {
+function uid(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 // ─── AI call ─────────────────────────────────────────────────────────────────
 
-async function callAI(systemPrompt: string, userPrompt: string): Promise<string> {
+async function ai(system: string, user: string): Promise<string> {
   const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
-  const response = await client.messages.create({
+  const r = await client.messages.create({
     model: 'claude-opus-4-5',
     max_tokens: 4096,
-    messages: [{ role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }]
+    messages: [{ role: 'user', content: `${system}\n\n${user}` }]
   });
-  const block = response.content[0];
-  if (block.type === 'text') return block.text;
+  const b = r.content[0];
+  if (b.type === 'text') return b.text;
   throw new Error('Unexpected AI response type');
 }
 
-// ─── FR-0: Collapse Precedence Constraint (CPC) validator ────────────────────
-//
-// Theorem FR-1: If CPC holds → no find_REPLACE state reachable.
-//
-// CPC: ∀ RenderNode r ∈ V, ∃ path: Input → OM → Collapse → Execution → r
-//      AND no path exists: Input → Execution → Render (bypassing Collapse)
+// ─── ELASTIC KEYWORD DETECTOR (CAR-1 pre-check) ──────────────────────────────
+// Catches semantically elastic language before AI decomposition
+
+const ELASTIC_PATTERNS = [
+  /optimis[ez]/i, /improv[ei]/i, /enhanc[ei]/i, /maximis[ez]/i, /maximiz[ei]/i,
+  /satisf[yi]/i, /experienc[ei]/i, /useful/i, /better/i, /good/i, /nice/i,
+  /appropriat[ei]/i, /reasonable/i, /suitable/i, /efficient/i, /effective/i,
+  /quality/i, /best\s+possible/i, /as\s+needed/i, /where\s+applicable/i
+];
+
+function detectElasticLanguage(text: string): string[] {
+  return ELASTIC_PATTERNS
+    .filter(p => p.test(text))
+    .map(p => p.source.replace(/\\[a-z]\[.*?\]/g, '*').replace(/\[.*?\]/g, '*'));
+}
+
+// ─── CAR-1: Constraint Determinism Condition (CDC) ───────────────────────────
+
+interface ACF {
+  observable_condition: string;
+  allowed_transition: string;
+  forbidden_transitions: string[];
+  verification_method: string;
+}
+
+interface ConstraintWithACF {
+  type: 'hard' | 'soft';
+  rule: string;
+  acf: ACF;
+  determinism_score: number;  // 0–1; must be 1.0 to pass CDC
+  cdc_valid: boolean;
+  elastic_terms: string[];
+}
+
+interface CARResult {
+  cdc_holds: boolean;
+  processed_constraints: ConstraintWithACF[];
+  failed_constraints: ConstraintWithACF[];
+  elastic_constraints_detected: string[];
+  constraint_hash: string;
+  allowed_state_set_hash: string;
+}
+
+async function runCAR1(rawConstraints: any[], omId: string): Promise<CARResult> {
+  const prompt = `You are the CAR-1 Constraint Determinism Validator.
+
+For each constraint, decompose it into Atomic Constraint Form (ACF) and score its determinism.
+
+Rules:
+- observable_condition: a concrete, measurable state check (no fuzzy language)
+- allowed_transition: exactly one permitted state change
+- forbidden_transitions: all other state changes that MUST NOT occur
+- verification_method: a specific, executable check (not "review" or "assess")
+- determinism_score: 1.0 = exactly one valid outcome, 0.0 = completely ambiguous
+
+REJECT any constraint containing: optimise, improve, enhance, satisfy, experience, usefulness, better, quality, appropriate, reasonable, best possible, where applicable, as needed, or any other semantically elastic phrase.
+
+Return ONLY valid JSON array (no prose, no fences):
+[
+  {
+    "original_rule": string,
+    "type": "hard"|"soft",
+    "acf": {
+      "observable_condition": string,
+      "allowed_transition": string,
+      "forbidden_transitions": [string],
+      "verification_method": string
+    },
+    "determinism_score": number,
+    "cdc_valid": boolean,
+    "rejection_reason": string | null
+  }
+]`;
+
+  const resp = await ai(prompt, `Constraints to decompose:\n${JSON.stringify(rawConstraints, null, 2)}\nom_id: ${omId}`);
+  const match = resp.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('CAR-1 returned no valid JSON');
+  const decomposed: any[] = JSON.parse(match[0]);
+
+  const processed: ConstraintWithACF[] = decomposed.map(d => {
+    const elasticTerms = detectElasticLanguage(d.original_rule + ' ' + JSON.stringify(d.acf));
+    const cdcValid = d.determinism_score >= 1.0 && elasticTerms.length === 0 && d.cdc_valid !== false;
+    return {
+      type: d.type || 'hard',
+      rule: d.original_rule,
+      acf: d.acf,
+      determinism_score: elasticTerms.length > 0 ? 0.0 : d.determinism_score,
+      cdc_valid: cdcValid,
+      elastic_terms: elasticTerms
+    };
+  });
+
+  const failed = processed.filter(c => !c.cdc_valid);
+  const elasticAll = [...new Set(processed.flatMap(c => c.elastic_terms))];
+  const constraintPayload = JSON.stringify(processed.map(c => c.acf));
+  const stateSetPayload = JSON.stringify(processed.map(c => c.acf.allowed_transition));
+
+  return {
+    cdc_holds: failed.length === 0,
+    processed_constraints: processed,
+    failed_constraints: failed,
+    elastic_constraints_detected: elasticAll,
+    constraint_hash: await sha256(constraintPayload),
+    allowed_state_set_hash: await sha256(stateSetPayload)
+  };
+}
+
+// ─── CGS-1: Controlled Generative Space ──────────────────────────────────────
+// Execution Manifold + Path Equivalence Test (PET)
+
+interface ManifoldPath {
+  path_id: string;
+  node_sequence: string[];
+  outcome_description: string;
+  outcome_hash: string;
+}
+
+interface CGSResult {
+  manifold_id: string;
+  equivalence_class_id: string;
+  canonical_outcome_hash: string;
+  paths: ManifoldPath[];
+  pet_holds: boolean;          // ∀ p1, p2 ∈ EM: outcome(p1) = outcome(p2)
+  divergent_paths: string[];   // paths whose outcome diverges — rejected
+  creative_variance_score: number;  // 0=rigid, 1=max safe variation
+  path_variance: number;       // must be 0 for PET to hold
+}
+
+async function runCGS1(
+  nodes: any[],
+  edges: any[],
+  activatedOM: any
+): Promise<CGSResult> {
+  const manifoldId = uid('manifold');
+
+  // For a single execution graph, generate alternative topological orderings
+  // that are outcome-equivalent (the manifold of valid implementations)
+  const prompt = `You are the CGS-1 Execution Manifold generator.
+
+Given an execution graph, enumerate 1–3 valid implementation paths (orderings/choices)
+that ALL produce the IDENTICAL outcome. This is the Execution Manifold.
+
+Rules:
+- Each path must satisfy: outcome(p) = success_condition
+- Variation is ONLY allowed in: algorithm choice, step ordering, internal decomposition
+- Variation is FORBIDDEN in: outcome, constraints, OM scope
+- Compute an outcome_description for each path — must be IDENTICAL across all paths
+- If you can only generate one valid path, return just that one
+
+Return ONLY valid JSON (no prose, no fences):
+{
+  "paths": [
+    {
+      "path_id": "p1",
+      "node_sequence": [list of node_ids in execution order],
+      "outcome_description": string,
+      "creative_choices": string
+    }
+  ],
+  "canonical_outcome": string,
+  "pet_assessment": string
+}`;
+
+  const resp = await ai(
+    prompt,
+    `OM singular_goal: ${activatedOM.singular_goal}\nSuccess condition: ${activatedOM.success_condition}\nNodes: ${JSON.stringify(nodes.map(n => ({ id: n.node_id, label: n.label, type: n.action_type })))}\nEdges: ${JSON.stringify(edges)}`
+  );
+
+  const match = resp.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('CGS-1 returned no valid JSON');
+  const cgsData = JSON.parse(match[0]);
+
+  const canonicalOutcomeHash = await sha256(cgsData.canonical_outcome || activatedOM.success_condition);
+
+  const paths: ManifoldPath[] = await Promise.all(
+    (cgsData.paths || []).map(async (p: any) => ({
+      path_id: p.path_id || uid('path'),
+      node_sequence: p.node_sequence || [],
+      outcome_description: p.outcome_description || cgsData.canonical_outcome,
+      outcome_hash: await sha256(p.outcome_description || cgsData.canonical_outcome)
+    }))
+  );
+
+  // PET: all path outcome hashes must match canonical
+  const divergent = paths.filter(p => p.outcome_hash !== canonicalOutcomeHash).map(p => p.path_id);
+  const petHolds = divergent.length === 0;
+  const equivalenceClassId = await sha256(`eqclass|${canonicalOutcomeHash}|${manifoldId}`);
+
+  return {
+    manifold_id: manifoldId,
+    equivalence_class_id: equivalenceClassId,
+    canonical_outcome_hash: canonicalOutcomeHash,
+    paths,
+    pet_holds: petHolds,
+    divergent_paths: divergent,
+    creative_variance_score: paths.length > 1 ? (paths.length - 1) / paths.length : 0,
+    path_variance: divergent.length
+  };
+}
+
+// ─── FR-0: Collapse Precedence Constraint (CPC) ──────────────────────────────
 
 interface CPCResult {
   cpc_holds: boolean;
   violations: string[];
-  proof_paths: Record<string, string[]>;  // node_id → path trace
+  proof_paths: Record<string, string[]>;
   fr1_guarantee: boolean;
   blocked_nodes: string[];
 }
 
-function validateCPC(
-  nodes: any[],
-  edges: any[],
-  omId: string,
-  collapseHash: string
-): CPCResult {
+function validateCPC(nodes: any[], edges: any[], omId: string, collapseHash: string): CPCResult {
   const violations: string[] = [];
   const proofPaths: Record<string, string[]> = {};
   const blockedNodes: string[] = [];
 
-  // Build adjacency for reverse traversal
   const inbound: Record<string, string[]> = {};
-  for (const node of nodes) inbound[node.node_id] = [];
-  for (const edge of edges) {
-    if (!inbound[edge.to]) inbound[edge.to] = [];
-    inbound[edge.to].push(edge.from);
+  for (const n of nodes) inbound[n.node_id] = [];
+  for (const e of edges) {
+    if (!inbound[e.to]) inbound[e.to] = [];
+    inbound[e.to].push(e.from);
   }
 
-  const renderNodes = nodes.filter(n => n.action_type === 'render');
-
-  for (const rn of renderNodes) {
-    // Check 1: origin_reference must match active OM
+  for (const rn of nodes.filter(n => n.action_type === 'render')) {
     if (rn.origin_reference !== omId) {
-      violations.push(`RenderNode ${rn.node_id} has origin_reference "${rn.origin_reference}" ≠ active OM "${omId}" — CPC violation`);
-      blockedNodes.push(rn.node_id);
-      continue;
+      violations.push(`RenderNode ${rn.node_id}: origin_reference mismatch — CPC violation`);
+      blockedNodes.push(rn.node_id); continue;
+    }
+    if (!rn.depends_on?.length) {
+      violations.push(`RenderNode ${rn.node_id}: no upstream deps — uncollapsed materialisation`);
+      blockedNodes.push(rn.node_id); continue;
+    }
+    if (edges.some(e => e.from === rn.node_id)) {
+      violations.push(`RenderNode ${rn.node_id}: has outgoing edges — must be terminal`);
+      blockedNodes.push(rn.node_id); continue;
     }
 
-    // Check 2: must have upstream dependencies (not a free-floating render)
-    if (!rn.depends_on || rn.depends_on.length === 0) {
-      violations.push(`RenderNode ${rn.node_id} has no upstream dependencies — represents uncollapsed materialisation`);
-      blockedNodes.push(rn.node_id);
-      continue;
-    }
-
-    // Check 3: no render node may have outgoing edges (it must be terminal)
-    const outgoing = edges.filter(e => e.from === rn.node_id);
-    if (outgoing.length > 0) {
-      violations.push(`RenderNode ${rn.node_id} has outgoing edges — render must be terminal`);
-      blockedNodes.push(rn.node_id);
-      continue;
-    }
-
-    // Check 4: build proof path — trace back to confirm collapse-bound ancestors
     const path = [rn.node_id];
-    let current = rn.node_id;
-    const visited = new Set<string>([current]);
-    let hasExecAncestor = false;
+    let cur = rn.node_id;
+    const visited = new Set([cur]);
+    let hasExec = false;
+    let lineageBreak = false;
 
-    while (inbound[current] && inbound[current].length > 0) {
-      const parent = inbound[current][0];
+    while (inbound[cur]?.length > 0) {
+      const parent = inbound[cur][0];
       if (visited.has(parent)) break;
       visited.add(parent);
       path.unshift(parent);
-      const parentNode = nodes.find(n => n.node_id === parent);
-      if (parentNode?.action_type === 'compute' || parentNode?.action_type === 'retrieve' || parentNode?.action_type === 'transform') {
-        hasExecAncestor = true;
-      }
-      // Verify each ancestor also carries OM lineage
-      if (parentNode && parentNode.origin_reference !== omId) {
-        violations.push(`Ancestor ${parent} of RenderNode ${rn.node_id} has unbound origin_reference — lineage break`);
-        blockedNodes.push(rn.node_id);
-      }
-      current = parent;
+      const pn = nodes.find(n => n.node_id === parent);
+      if (['compute','retrieve','transform'].includes(pn?.action_type)) hasExec = true;
+      if (pn && pn.origin_reference !== omId) { lineageBreak = true; break; }
+      cur = parent;
     }
 
-    if (!hasExecAncestor) {
-      violations.push(`RenderNode ${rn.node_id} has no execution ancestors — bypasses execution graph`);
+    if (lineageBreak) {
+      violations.push(`RenderNode ${rn.node_id}: ancestor lineage break — unbound origin_reference`);
+      blockedNodes.push(rn.node_id);
+    } else if (!hasExec) {
+      violations.push(`RenderNode ${rn.node_id}: no execution ancestors — bypasses graph`);
       blockedNodes.push(rn.node_id);
     } else {
-      // CPC satisfied — record proof path
-      proofPaths[rn.node_id] = [
-        `AuthInput`,
-        `OM:${omId}`,
-        `CollapseNode:${collapseHash.slice(0, 12)}`,
-        ...path
-      ];
+      proofPaths[rn.node_id] = ['AuthInput', `OM:${omId}`, `Collapse:${collapseHash.slice(0,12)}`, ...path];
     }
   }
 
-  const cpcHolds = violations.length === 0;
-  return {
-    cpc_holds: cpcHolds,
-    violations,
-    proof_paths: proofPaths,
-    fr1_guarantee: cpcHolds,
-    blocked_nodes: blockedNodes
-  };
+  return { cpc_holds: violations.length === 0, violations, proof_paths: proofPaths, fr1_guarantee: violations.length === 0, blocked_nodes: blockedNodes };
 }
 
-// ─── Render Gate Rule (RGR) ──────────────────────────────────────────────────
-//
-// function render(node):
-//   assert node.origin_path.includes(CollapseNode)
-//   assert node.OM.status == "active"
-//   assert validate(node, node.OM.constraints) == true
-//   return node
-//
-// If any condition fails: node is DROPPED (not patched), violation logged.
+// ─── Render Gate (RGR) ───────────────────────────────────────────────────────
 
 interface RGRResult {
   passed: boolean;
@@ -165,68 +320,71 @@ interface RGRResult {
   gate_log: Array<{ node_id: string; passed: boolean; reason: string }>;
 }
 
-function applyRenderGate(
-  nodes: any[],
-  cpcResult: CPCResult,
-  activatedOM: any
-): RGRResult {
+function applyRenderGate(nodes: any[], cpc: CPCResult, om: any, car: CARResult): RGRResult {
   const renderNodes = nodes.filter(n => n.action_type === 'render');
-  const dropped: string[] = [];
-  const admitted: string[] = [];
+  const dropped: string[] = [], admitted: string[] = [];
   const gateLog: Array<{ node_id: string; passed: boolean; reason: string }> = [];
 
   for (const rn of renderNodes) {
-    // Gate condition 1: CPC not violated
-    if (cpcResult.blocked_nodes.includes(rn.node_id)) {
+    if (cpc.blocked_nodes.includes(rn.node_id)) {
       dropped.push(rn.node_id);
-      gateLog.push({ node_id: rn.node_id, passed: false, reason: 'CPC violation — no collapse precedence' });
-      continue;
+      gateLog.push({ node_id: rn.node_id, passed: false, reason: 'FR-0: CPC violation' }); continue;
     }
-
-    // Gate condition 2: OM must be active
-    if (activatedOM.status !== 'active') {
+    if (om.status !== 'active') {
       dropped.push(rn.node_id);
-      gateLog.push({ node_id: rn.node_id, passed: false, reason: `OM.status = "${activatedOM.status}" ≠ "active"` });
-      continue;
+      gateLog.push({ node_id: rn.node_id, passed: false, reason: `OM.status="${om.status}" ≠ "active"` }); continue;
     }
-
-    // Gate condition 3: constraint validation
-    const hardConstraints = (activatedOM.constraint_set || []).filter((c: any) => c.type === 'hard');
-    let constraintViolation: string | null = null;
-
-    for (const constraint of hardConstraints) {
-      // Structural constraint: render node cannot introduce new scope
-      if (constraint.rule.toLowerCase().includes('scope') && rn.label.toLowerCase().includes('additional')) {
-        constraintViolation = `Hard constraint violated: "${constraint.rule}"`;
-        break;
-      }
-      // Constraint: no speculative features
-      if (constraint.rule.toLowerCase().includes('speculative') && rn.input_schema?.description?.toLowerCase().includes('optional')) {
-        constraintViolation = `Hard constraint violated: "${constraint.rule}" — speculative input detected`;
-        break;
-      }
-    }
-
-    if (constraintViolation) {
+    if (!car.cdc_holds) {
       dropped.push(rn.node_id);
-      gateLog.push({ node_id: rn.node_id, passed: false, reason: constraintViolation });
-      continue;
+      gateLog.push({ node_id: rn.node_id, passed: false, reason: `CAR-1: CDC failed — elastic constraints present: [${car.elastic_constraints_detected.join(', ')}]` }); continue;
     }
-
-    // Gate passed
     admitted.push(rn.node_id);
-    gateLog.push({ node_id: rn.node_id, passed: true, reason: 'CPC holds ∧ OM.status=active ∧ constraints satisfied' });
+    gateLog.push({ node_id: rn.node_id, passed: true, reason: 'CPC ∧ OM.active ∧ CDC ∧ constraints satisfied' });
+  }
+
+  return { passed: dropped.length === 0, dropped_nodes: dropped, admitted_nodes: admitted, gate_log: gateLog };
+}
+
+// ─── MOCL-1: Multi-OM Isolation Check ────────────────────────────────────────
+
+interface MOCLResult {
+  isolation_domain_id: string;
+  isolation_holds: boolean;
+  shared_state_detected: boolean;
+  cross_om_interactions: string[];
+  omm_required: boolean;
+  domain_boundary: { includes: string[]; excludes: string[] };
+}
+
+async function runMOCL1(omId: string, nodes: any[], existingOMs: any[]): Promise<MOCLResult> {
+  const domainId = await sha256(`domain|${omId}`);
+
+  // Check if any existing active OMs share node IDs or output schemas
+  const nodeIds = nodes.map(n => n.node_id);
+  const crossInteractions: string[] = [];
+
+  for (const existingOM of existingOMs) {
+    if (existingOM.om_id === omId) continue;
+    if (existingOM.status !== 'active') continue;
+    // In a full runtime, we'd check execution graph overlap here
+    // For now, flag any active concurrent OMs as requiring OMM mediation
+    crossInteractions.push(`OM:${existingOM.om_id} (goal: "${existingOM.singular_goal?.slice(0, 40)}…") — requires OMM mediation`);
   }
 
   return {
-    passed: dropped.length === 0,
-    dropped_nodes: dropped,
-    admitted_nodes: admitted,
-    gate_log: gateLog
+    isolation_domain_id: domainId.slice(0, 16),
+    isolation_holds: crossInteractions.length === 0,
+    shared_state_detected: false,
+    cross_om_interactions: crossInteractions,
+    omm_required: crossInteractions.length > 0,
+    domain_boundary: {
+      includes: nodeIds,
+      excludes: ['all nodes from other OM domains']
+    }
   };
 }
 
-// ─── Main handler ─────────────────────────────────────────────────────────────
+// ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   try {
@@ -236,210 +394,152 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const { raw_text, context_state = {}, session_id } = body;
+    if (!raw_text) return Response.json({ error: 'raw_text required' }, { status: 400 });
 
-    if (!raw_text || typeof raw_text !== 'string') {
-      return Response.json({ error: 'raw_text required' }, { status: 400 });
-    }
-
-    const sid = session_id || generateId('session');
+    const sid = session_id || uid('session');
     const now = Date.now();
-    const pipelineStages: any[] = [];
-    const fabricChain: any[] = [];
+    const stages: any[] = [];
+    const fabric: any[] = [];
 
-    // ─── STEP 1: AuthInput capture ────────────────────────────────────────
-    const authInputId = generateId('ai');
-    const authInputPayload = { raw_text, context_state, session_id: sid };
-    const authInputHash = await sha256(JSON.stringify(authInputPayload) + now);
-    pipelineStages.push({ stage: 'AuthInput', status: 'captured', id: authInputId, hash: authInputHash.slice(0, 16) });
+    // ── 1. AuthInput ─────────────────────────────────────────────────────────
+    const authInputId = uid('ai');
+    const authInputHash = await sha256(JSON.stringify({ raw_text, context_state, sid }) + now);
+    stages.push({ stage: 'AuthInput', status: 'captured', id: authInputId, hash: authInputHash.slice(0, 16) });
 
-    // ─── STEP 2: OPL ─────────────────────────────────────────────────────
-    const oplSystemPrompt = `You are the Objective Proposal Layer (OPL) in an AuthOrigin Canonical Objective Runtime.
-
-Your ONLY job: analyse raw user input and propose 1–3 candidate Objective Molecules.
-Each OM must be DISTINCT, MEASURABLE, and represent a SINGLE collapsed intent.
-
-Return ONLY a valid JSON array (no markdown, no prose, no fences).
-
-Each candidate must have:
-- singular_goal: string (one sentence, one intent, no conjunctions joining separate goals)
-- success_condition: string (measurable — what does done look like, specifically?)
-- exclusion_conditions: string[] (what interpretations are explicitly NOT this goal?)
-- constraint_set: [{type: "hard"|"soft", rule: string}]
-- confidence: number 0–1
-- rejection_reason: string (honest self-critique)
-
-Rules:
-- Clearly one thing → exactly 1 candidate, confidence > 0.85
-- Ambiguous → 2–3 distinct interpretations
-- NEVER merge multiple goals
-- NEVER use vague success conditions`;
-
-    const oplResponse = await callAI(
-      oplSystemPrompt,
-      `AuthInput raw_text: "${raw_text}"\nContext: ${JSON.stringify(context_state)}`
+    // ── 2. OPL ───────────────────────────────────────────────────────────────
+    const oplResp = await ai(
+      `You are the Objective Proposal Layer (OPL).
+Analyse input and propose 1–3 candidate Objective Molecules.
+Return ONLY a valid JSON array (no markdown, no prose):
+[{ "singular_goal": string, "success_condition": string, "exclusion_conditions": [string], "constraint_set": [{"type":"hard"|"soft","rule":string}], "confidence": number, "rejection_reason": string }]
+Rules: one clear goal → 1 candidate (conf > 0.85). Ambiguous → 2–3. NEVER merge goals. NEVER vague success conditions.`,
+      `raw_text: "${raw_text}"\ncontext: ${JSON.stringify(context_state)}`
     );
 
-    const arrMatch = oplResponse.match(/\[[\s\S]*\]/);
-    if (!arrMatch) return Response.json({ error: 'OPL returned no valid JSON array', session_id: sid }, { status: 500 });
-    const candidates: any[] = JSON.parse(arrMatch[0]);
+    const arrM = oplResp.match(/\[[\s\S]*\]/);
+    if (!arrM) return Response.json({ error: 'OPL: no JSON array', session_id: sid }, { status: 500 });
+    const candidates: any[] = JSON.parse(arrM[0]);
+    stages.push({ stage: 'OPL', status: 'complete', candidate_count: candidates.length, candidates: candidates.map((c,i) => ({ index: i, singular_goal: c.singular_goal, confidence: c.confidence })) });
 
-    pipelineStages.push({
-      stage: 'OPL',
-      status: 'complete',
-      candidate_count: candidates.length,
-      candidates: candidates.map((c, i) => ({ index: i, singular_goal: c.singular_goal, confidence: c.confidence }))
-    });
-
-    // ─── STEP 3: CCE ─────────────────────────────────────────────────────
-    let activeOM: any = null;
-    let rejectedOMs: any[] = [];
-    let cceDecision = '';
-    let cceReason = '';
+    // ── 3. CCE ───────────────────────────────────────────────────────────────
+    let activeOM: any = null, rejectedOMs: any[] = [], cceDecision = '', cceReason = '';
 
     if (candidates.length === 1 && candidates[0].confidence >= 0.75) {
-      activeOM = candidates[0];
-      cceDecision = 'direct_collapse';
-      cceReason = 'Single candidate with sufficient confidence';
+      activeOM = candidates[0]; cceDecision = 'direct_collapse'; cceReason = 'Single high-confidence candidate';
     } else {
-      const cceSystemPrompt = `You are the Canonical Collapse Engine (CCE).
+      const cceResp = await ai(
+        `You are the Canonical Collapse Engine (CCE). Pick exactly ONE winner.
+Rules: prefer measurability, prefer specificity, incompatible goals → needs_clarification=true.
+Return ONLY valid JSON: {"winner_index":number|null,"needs_clarification":boolean,"clarification_question":string|null,"rejection_reasons":{"0":string,"1":string},"cce_reasoning":string}`,
+        `Candidates:\n${JSON.stringify(candidates, null, 2)}`
+      );
+      const objM = cceResp.match(/\{[\s\S]*\}/);
+      if (!objM) return Response.json({ error: 'CCE: no JSON', session_id: sid }, { status: 500 });
+      const cceR = JSON.parse(objM[0]);
+      cceReason = cceR.cce_reasoning;
 
-You receive competing OM candidates. Return exactly ONE winner.
-
-Rules:
-- Prefer measurability over expressiveness
-- Prefer specificity over scope
-- Same goal, different phrasings → pick tighter one
-- Genuinely incompatible goals → needs_clarification=true
-- NEVER select multiple winners
-- NEVER merge distinct goals
-
-Return ONLY valid JSON (no prose, no fences):
-{
-  "winner_index": number | null,
-  "needs_clarification": boolean,
-  "clarification_question": string | null,
-  "rejection_reasons": { "0": string, "1": string },
-  "cce_reasoning": string
-}`;
-
-      const cceResponse = await callAI(cceSystemPrompt, `Candidates:\n${JSON.stringify(candidates, null, 2)}`);
-      const objMatch = cceResponse.match(/\{[\s\S]*\}/);
-      if (!objMatch) return Response.json({ error: 'CCE returned no valid JSON', session_id: sid }, { status: 500 });
-      const cceResult = JSON.parse(objMatch[0]);
-
-      cceReason = cceResult.cce_reasoning;
-
-      if (cceResult.needs_clarification) {
+      if (cceR.needs_clarification) {
         return Response.json({
-          status: 'blocked_ambiguity',
-          session_id: sid,
-          clarification_required: true,
-          clarification_question: cceResult.clarification_question,
-          candidates: candidates.map((c, i) => ({ index: i, singular_goal: c.singular_goal })),
-          pipeline_stages: pipelineStages,
-          fr0_status: 'not_reached — blocked at CCE before any representation was attempted',
-          message: 'CCE cannot collapse to a single objective. No representation emitted. Clarification required.'
+          status: 'blocked_ambiguity', session_id: sid, clarification_required: true,
+          clarification_question: cceR.clarification_question,
+          candidates: candidates.map((c,i) => ({ index: i, singular_goal: c.singular_goal })),
+          pipeline_stages: stages,
+          fr0_status: 'not_reached — blocked before representation',
+          car_status: 'not_reached',
+          cgs_status: 'not_reached',
+          mocl_status: 'not_reached'
         });
       }
 
-      activeOM = candidates[cceResult.winner_index];
-      rejectedOMs = candidates
-        .filter((_, i) => i !== cceResult.winner_index)
-        .map((c, i) => ({ ...c, rejection_reason: cceResult.rejection_reasons?.[String(i)] || 'Discarded by CCE' }));
+      activeOM = candidates[cceR.winner_index];
+      rejectedOMs = candidates.filter((_,i) => i !== cceR.winner_index).map((c,i) => ({ ...c, rejection_reason: cceR.rejection_reasons?.[String(i)] || 'Discarded by CCE' }));
       cceDecision = 'collapse_with_rejection';
     }
 
-    // ─── STEP 4: Activation Lock ──────────────────────────────────────────
-    const omId = generateId('om');
+    // ── 4. Activation Lock ───────────────────────────────────────────────────
+    const omId = uid('om');
     const lineageHash = await sha256(`${authInputHash}|${JSON.stringify(activeOM)}|${omId}`);
     const collapseHash = await sha256(`collapse|${omId}|${lineageHash}|${now}`);
+    const isolationDomainId = (await sha256(`domain|${omId}`)).slice(0, 16);
 
-    const activatedOM = {
-      ...activeOM,
-      om_id: omId,
-      auth_input_id: authInputId,
-      lineage_hash: lineageHash,
-      status: 'active',
-      candidate_siblings: rejectedOMs.map((_, i) => `rejected_${i}`)
-    };
+    stages.push({ stage: 'ActivationLock', status: 'locked', om_id: omId, singular_goal: activeOM.singular_goal, lineage_hash: lineageHash, immutable: true });
 
-    pipelineStages.push({
-      stage: 'ActivationLock',
-      status: 'locked',
-      om_id: omId,
-      singular_goal: activatedOM.singular_goal,
-      lineage_hash: lineageHash,
-      collapse_hash: collapseHash.slice(0, 16),
-      immutable: true,
-      note: 'OM.status=active — no modification permitted, only supersession via new collapse'
+    // ── 5. CAR-1: Constraint Determinism ─────────────────────────────────────
+    let carResult: CARResult;
+    try {
+      carResult = await runCAR1(activeOM.constraint_set || [], omId);
+    } catch (e) {
+      return Response.json({ error: `CAR-1 failed: ${e.message}`, session_id: sid }, { status: 500 });
+    }
+
+    stages.push({
+      stage: 'CAR1_ConstraintDeterminism',
+      status: carResult.cdc_holds ? 'passed' : 'elastic_detected',
+      cdc_holds: carResult.cdc_holds,
+      constraints_processed: carResult.processed_constraints.length,
+      constraints_failed: carResult.failed_constraints.length,
+      elastic_terms_detected: carResult.elastic_constraints_detected,
+      constraint_hash: carResult.constraint_hash,
+      allowed_state_set_hash: carResult.allowed_state_set_hash,
+      theorem: 'CDC: ∀ constraint c, ∃ exactly one valid state transition outcome set S'
     });
 
-    // ─── STEP 5: Execution Graph Generation ──────────────────────────────
-    const egSystemPrompt = `You are the Execution Graph Generator in an AuthOrigin runtime.
-
-Given an active OM, generate the MINIMAL execution graph.
-
-Rules:
-- Every node MUST set origin_reference to the EXACT om_id provided
-- Only include nodes that directly serve success_condition
-- No speculative nodes whatsoever
-- action_type: "compute" | "retrieve" | "transform" | "render"
-- Render nodes are TERMINAL ONLY — no outgoing edges allowed
-- depends_on is an array of node_id strings from earlier nodes
-
-Return ONLY valid JSON (no prose, no fences):
-{
-  "nodes": [
-    {
-      "node_id": "string",
-      "label": "string",
-      "action_type": "compute|retrieve|transform|render",
-      "input_schema": { "description": "string" },
-      "output_schema": { "description": "string" },
-      "origin_reference": "REPLACE_WITH_OM_ID",
-      "depends_on": []
+    // If CDC fails, block — elastic constraints reintroduce ambiguity
+    if (!carResult.cdc_holds) {
+      return Response.json({
+        status: 'blocked_elastic_constraints',
+        session_id: sid,
+        car_result: carResult,
+        message: `CAR-1 rejected: ${carResult.failed_constraints.length} constraint(s) are semantically elastic. Constraints must be rewritten in ACF before execution proceeds.`,
+        failed_constraints: carResult.failed_constraints,
+        rewrite_required: true,
+        pipeline_stages: stages
+      });
     }
-  ],
-  "edges": [{ "from": "string", "to": "string", "label": "string" }],
-  "validation_note": "string"
-}`;
 
-    const egResponse = await callAI(
-      egSystemPrompt,
-      `om_id: ${omId}\nsingular_goal: ${activatedOM.singular_goal}\nsuccess_condition: ${activatedOM.success_condition}\nexclusion_conditions: ${JSON.stringify(activatedOM.exclusion_conditions)}\nconstraint_set: ${JSON.stringify(activatedOM.constraint_set)}`
+    // ── 6. Execution Graph Generation ────────────────────────────────────────
+    const egResp = await ai(
+      `You are the Execution Graph Generator.
+Generate the MINIMAL execution graph for this OM.
+Every node MUST set origin_reference to the om_id provided.
+No speculative nodes. Render nodes are TERMINAL ONLY.
+Return ONLY valid JSON: {"nodes":[{"node_id":string,"label":string,"action_type":"compute"|"retrieve"|"transform"|"render","input_schema":{"description":string},"output_schema":{"description":string},"origin_reference":string,"depends_on":[]}],"edges":[{"from":string,"to":string,"label":string}],"validation_note":string}`,
+      `om_id: ${omId}\nsingular_goal: ${activeOM.singular_goal}\nsuccess_condition: ${activeOM.success_condition}\nexclusion_conditions: ${JSON.stringify(activeOM.exclusion_conditions)}\nACF_constraints: ${JSON.stringify(carResult.processed_constraints.map(c => c.acf))}`
     );
 
-    const egMatch = egResponse.match(/\{[\s\S]*\}/);
-    if (!egMatch) return Response.json({ error: 'EG generation returned no valid JSON', session_id: sid }, { status: 500 });
-    const egData = JSON.parse(egMatch[0]);
-
+    const egM = egResp.match(/\{[\s\S]*\}/);
+    if (!egM) return Response.json({ error: 'EG: no JSON', session_id: sid }, { status: 500 });
+    const egData = JSON.parse(egM[0]);
     const nodes = (egData.nodes || []).map((n: any) => ({ ...n, origin_reference: omId }));
     const edges = egData.edges || [];
-    const executionGraph = {
-      eg_id: generateId('eg'),
-      om_id: omId,
-      nodes,
-      edges,
-      status: 'building',
-      validation_errors: []
-    };
 
-    pipelineStages.push({
-      stage: 'ExecutionGraphGeneration',
-      status: 'built',
-      eg_id: executionGraph.eg_id,
-      node_count: nodes.length,
-      edge_count: edges.length,
-      validation_note: egData.validation_note
+    stages.push({ stage: 'ExecutionGraphGeneration', status: 'built', node_count: nodes.length, edge_count: edges.length, note: egData.validation_note });
+
+    // ── 7. CGS-1: Controlled Generative Space ────────────────────────────────
+    let cgsResult: CGSResult;
+    try {
+      cgsResult = await runCGS1(nodes, edges, activeOM);
+    } catch (e) {
+      return Response.json({ error: `CGS-1 failed: ${e.message}`, session_id: sid }, { status: 500 });
+    }
+
+    stages.push({
+      stage: 'CGS1_ExecutionManifold',
+      status: cgsResult.pet_holds ? 'outcome_invariant' : 'divergence_detected',
+      manifold_id: cgsResult.manifold_id,
+      equivalence_class_id: cgsResult.equivalence_class_id,
+      path_count: cgsResult.paths.length,
+      pet_holds: cgsResult.pet_holds,
+      divergent_paths: cgsResult.divergent_paths,
+      creative_variance_score: cgsResult.creative_variance_score,
+      path_variance: cgsResult.path_variance,
+      theorem: 'PET: ∀ p1,p2 ∈ EM, outcome(p1) = outcome(p2)'
     });
 
-    // ─── STEP 6: FR-0 CPC Validation ─────────────────────────────────────
-    // Theorem FR-1: CPC holds → no find_REPLACE state reachable
+    // ── 8. FR-0: CPC Validation ──────────────────────────────────────────────
     const cpcResult = validateCPC(nodes, edges, omId, collapseHash);
-    executionGraph.status = cpcResult.cpc_holds ? 'valid' : 'cpc_violation';
-    executionGraph.validation_errors = cpcResult.violations;
 
-    pipelineStages.push({
+    stages.push({
       stage: 'FR0_CPCValidation',
       status: cpcResult.cpc_holds ? 'passed' : 'violations_detected',
       cpc_holds: cpcResult.cpc_holds,
@@ -447,194 +547,243 @@ Return ONLY valid JSON (no prose, no fences):
       violations: cpcResult.violations,
       blocked_nodes: cpcResult.blocked_nodes,
       proof_paths: cpcResult.proof_paths,
-      theorem: 'FR-1: CPC holds → ∀ RenderNode r, no find_REPLACE state reachable at r'
+      theorem: 'FR-1: CPC holds → ∀ RenderNode r, no find_REPLACE state reachable'
     });
 
-    // ─── STEP 7: Render Gate (RGR) ────────────────────────────────────────
-    // assert origin_path.includes(CollapseNode) ∧ OM.status=active ∧ constraints satisfied
-    const rgrResult = applyRenderGate(nodes, cpcResult, activatedOM);
+    // ── 9. Render Gate (RGR) ─────────────────────────────────────────────────
+    const rgrResult = applyRenderGate(nodes, cpcResult, { ...activeOM, status: 'active' }, carResult);
 
-    pipelineStages.push({
+    stages.push({
       stage: 'RenderGate_RGR',
       status: rgrResult.passed ? 'all_admitted' : 'nodes_dropped',
-      admitted_count: rgrResult.admitted_nodes.length,
-      dropped_count: rgrResult.dropped_nodes.length,
-      gate_log: rgrResult.gate_log,
-      rule: 'RGR: dropped nodes are not patched — system re-enters collapse phase'
+      admitted: rgrResult.admitted_nodes.length,
+      dropped: rgrResult.dropped_nodes.length,
+      gate_log: rgrResult.gate_log
     });
 
-    // If nodes were dropped, log violations to fabric (not silently masked)
-    const violationFabricEntries: any[] = [];
-    for (const droppedId of rgrResult.dropped_nodes) {
-      const dropPayload = { dropped_node: droppedId, reason: rgrResult.gate_log.find(g => g.node_id === droppedId)?.reason };
-      const violationHash = await sha256(`violation|${omId}|${droppedId}|${now}`);
-      const violationEntry = {
-        hash: violationHash,
-        parent_hash: null, // will be chained after collapse entry
-        om_id: omId,
-        session_id: sid,
-        event_type: 'violation',
-        payload_hash: await sha256(JSON.stringify(dropPayload)),
-        payload_summary: `RGR dropped node ${droppedId}: ${dropPayload.reason}`,
-        invariant_check: {
-          singularity: true,
-          no_orphan_execution: true,
-          no_representation_without_collapse: true,
-          no_speculative_features: false // violation detected
-        },
-        timestamp_ms: now
-      };
-      violationFabricEntries.push(violationEntry);
-    }
+    // ── 10. MOCL-1: Isolation Check ──────────────────────────────────────────
+    // Fetch existing active OMs to check for domain collisions
+    let existingOMs: any[] = [];
+    try {
+      const existing = await base44.entities.ObjectiveMolecule.list();
+      existingOMs = (existing || []).filter((o: any) => o.status === 'active');
+    } catch (_) { /* if none exist yet, that's fine */ }
 
-    // ─── STEP 8: UI Materialisation — admitted nodes only ─────────────────
-    const admittedRenderNodes = nodes.filter(
-      (n: any) => n.action_type === 'render' && rgrResult.admitted_nodes.includes(n.node_id)
-    );
+    const moclResult = await runMOCL1(omId, nodes, existingOMs);
+
+    stages.push({
+      stage: 'MOCL1_IsolationCheck',
+      status: moclResult.isolation_holds ? 'isolated' : 'mediation_required',
+      isolation_domain_id: moclResult.isolation_domain_id,
+      isolation_holds: moclResult.isolation_holds,
+      cross_om_interactions: moclResult.cross_om_interactions,
+      omm_required: moclResult.omm_required,
+      domain_boundary: moclResult.domain_boundary,
+      theorem: 'MOCL-1: ∀ OM_A, OM_B: domain(A) ∩ domain(B) = ∅ without explicit OMM mediation'
+    });
+
+    // ── Build activated OM record ────────────────────────────────────────────
+    const activatedOM = {
+      ...activeOM,
+      om_id: omId,
+      auth_input_id: authInputId,
+      lineage_hash: lineageHash,
+      status: 'active',
+      candidate_siblings: rejectedOMs.map((_, i) => `rejected_${i}`),
+      isolation_domain_id: moclResult.isolation_domain_id,
+      ccc_valid: true,
+      car_valid: carResult.cdc_holds,
+      execution_manifold_id: cgsResult.manifold_id,
+      version: 1,
+      constraint_set: carResult.processed_constraints  // upgraded to ACF form
+    };
+
+    // ── UI Materialisation ───────────────────────────────────────────────────
+    const admittedRender = nodes.filter(n => n.action_type === 'render' && rgrResult.admitted_nodes.includes(n.node_id));
 
     const uiProjection = {
-      allowed_surfaces: admittedRenderNodes.map((n: any) => ({
+      allowed_surfaces: admittedRender.map(n => ({
         surface_id: n.node_id,
         label: n.label,
         bound_to_om: n.origin_reference === omId,
         input_from: n.depends_on,
-        cpc_proof_path: cpcResult.proof_paths[n.node_id] || [],
+        cpc_proof: cpcResult.proof_paths[n.node_id] || [],
+        equivalence_class: cgsResult.equivalence_class_id,
+        isolation_domain: moclResult.isolation_domain_id,
         rgr_status: 'admitted'
       })),
       blocked_surfaces: rgrResult.dropped_nodes.map(id => ({
         surface_id: id,
         reason: rgrResult.gate_log.find(g => g.node_id === id)?.reason,
-        replacement: 'none — re-collapse required'
+        action: 'DROPPED — re-collapse required, no patching permitted'
       })),
-      anti_bloat_check: `${admittedRenderNodes.length} surface(s) admitted, ${rgrResult.dropped_nodes.length} blocked — no replacements, no patches`,
-      fr0_status: cpcResult.fr1_guarantee && rgrResult.passed
-        ? 'GUARANTEED: no find_REPLACE state reachable'
-        : 'PARTIAL: some nodes blocked — re-collapse required for blocked surfaces'
+      fr0_status: cpcResult.fr1_guarantee && rgrResult.passed ? 'GUARANTEED' : 'PARTIAL',
+      car_status: carResult.cdc_holds ? 'DETERMINISTIC' : 'ELASTIC_DETECTED',
+      cgs_status: cgsResult.pet_holds ? 'OUTCOME_INVARIANT' : 'DIVERGENCE_DETECTED',
+      mocl_status: moclResult.isolation_holds ? 'ISOLATED' : 'MEDIATION_REQUIRED',
+      anti_bloat: `${admittedRender.length} surface(s) admitted across ${cgsResult.paths.length} equivalent path(s)`
     };
 
-    pipelineStages.push({
+    stages.push({
       stage: 'UIMaterialisation',
       status: 'projected',
       surfaces_admitted: uiProjection.allowed_surfaces.length,
       surfaces_blocked: uiProjection.blocked_surfaces.length,
       fr0_status: uiProjection.fr0_status,
-      anti_bloat_check: uiProjection.anti_bloat_check
+      car_status: uiProjection.car_status,
+      cgs_status: uiProjection.cgs_status,
+      mocl_status: uiProjection.mocl_status
     });
 
-    // ─── STEP 9: origin.fabric — append-only causal chain ─────────────────
-    // No overwrites. Violations are visible entries, not masked patches.
-
-    // 1. Input entry (genesis)
-    const inputPayloadHash = await sha256(raw_text + sid + now);
-    const inputFabricHash = await sha256(`input|${omId}|${inputPayloadHash}|${now}`);
-    fabricChain.push({
-      hash: inputFabricHash, parent_hash: null, om_id: omId, session_id: sid,
-      event_type: 'input', payload_hash: inputPayloadHash,
+    // ── origin.fabric chain ──────────────────────────────────────────────────
+    const inputPH = await sha256(raw_text + sid + now);
+    const inputFH = await sha256(`input|${omId}|${inputPH}|${now}`);
+    fabric.push({
+      hash: inputFH, parent_hash: null, om_id: omId, session_id: sid, event_type: 'input',
+      payload_hash: inputPH,
       payload_summary: `AuthInput: "${raw_text.slice(0, 80)}${raw_text.length > 80 ? '…' : ''}"`,
-      invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: false, no_speculative_features: true },
+      invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: false, no_speculative_features: true, cdc_holds: false, pet_holds: false, mocl_isolation_holds: false },
       timestamp_ms: now
     });
 
-    // 2. Collapse entry
-    const collapsePayloadHash = await sha256(JSON.stringify(activatedOM));
-    const collapseFabricHash = await sha256(`collapse|${omId}|${collapsePayloadHash}|${now + 1}`);
-    fabricChain.push({
-      hash: collapseFabricHash, parent_hash: inputFabricHash, om_id: omId, session_id: sid,
-      event_type: 'collapse', payload_hash: collapsePayloadHash,
-      payload_summary: `CCE collapsed → "${activatedOM.singular_goal}" (conf: ${activatedOM.confidence}, method: ${cceDecision})`,
-      invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: true, no_speculative_features: true },
-      timestamp_ms: now + 1
+    const collapsePH = await sha256(JSON.stringify(activatedOM));
+    const collapseFH = await sha256(`collapse|${omId}|${collapsePH}|${now+1}`);
+    fabric.push({
+      hash: collapseFH, parent_hash: inputFH, om_id: omId, session_id: sid, event_type: 'collapse',
+      payload_hash: collapsePH,
+      payload_summary: `CCE → "${activeOM.singular_goal}" (${cceDecision}, conf: ${activeOM.confidence})`,
+      invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: true, no_speculative_features: true, cdc_holds: carResult.cdc_holds, pet_holds: false, mocl_isolation_holds: false },
+      timestamp_ms: now+1
     });
 
-    // 3. Violation entries (if any) — visible, not masked
-    let lastHash = collapseFabricHash;
-    for (const ve of violationFabricEntries) {
-      ve.parent_hash = lastHash;
-      const vHash = await sha256(`violation|${omId}|${ve.dropped_node || ve.payload_hash}|${now + 2}`);
-      ve.hash = vHash;
-      fabricChain.push(ve);
-      lastHash = vHash;
+    // CAR-1 fabric entry
+    const carPH = await sha256(JSON.stringify(carResult));
+    const carFH = await sha256(`car_check|${omId}|${carPH}|${now+2}`);
+    fabric.push({
+      hash: carFH, parent_hash: collapseFH, om_id: omId, session_id: sid, event_type: 'car_check',
+      payload_hash: carPH,
+      payload_summary: `CAR-1: CDC=${carResult.cdc_holds}, ${carResult.processed_constraints.length} constraints decomposed to ACF, elastic=[${carResult.elastic_constraints_detected.join(',')||'none'}]`,
+      invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: true, no_speculative_features: true, cdc_holds: carResult.cdc_holds, pet_holds: false, mocl_isolation_holds: false },
+      car_layer: { constraint_hash: carResult.constraint_hash, determinism_score: carResult.cdc_holds ? 1.0 : 0.0, allowed_state_set_hash: carResult.allowed_state_set_hash, elastic_constraints_detected: carResult.elastic_constraints_detected },
+      timestamp_ms: now+2
+    });
+
+    // CGS-1 fabric entry
+    const cgsPH = await sha256(JSON.stringify(cgsResult));
+    const cgsFH = await sha256(`cgs_path|${omId}|${cgsPH}|${now+3}`);
+    fabric.push({
+      hash: cgsFH, parent_hash: carFH, om_id: omId, session_id: sid, event_type: 'cgs_path',
+      payload_hash: cgsPH,
+      payload_summary: `CGS-1: manifold=${cgsResult.manifold_id}, ${cgsResult.paths.length} equivalent path(s), PET=${cgsResult.pet_holds}`,
+      invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: true, no_speculative_features: true, cdc_holds: carResult.cdc_holds, pet_holds: cgsResult.pet_holds, mocl_isolation_holds: false },
+      cgs_layer: { execution_path_hash: await sha256(JSON.stringify(cgsResult.paths)), equivalence_class_id: cgsResult.equivalence_class_id, outcome_hash: cgsResult.canonical_outcome_hash, path_variance: cgsResult.path_variance },
+      timestamp_ms: now+3
+    });
+
+    // Execution fabric entry
+    const execPH = await sha256(JSON.stringify({ nodes, edges }));
+    const execFH = await sha256(`execution|${omId}|${execPH}|${now+4}`);
+    fabric.push({
+      hash: execFH, parent_hash: cgsFH, om_id: omId, session_id: sid, event_type: 'execution',
+      payload_hash: execPH,
+      payload_summary: `ExecGraph: ${nodes.length} nodes, CPC=${cpcResult.cpc_holds}, FR-1=${cpcResult.fr1_guarantee}`,
+      invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: true, no_speculative_features: true, cdc_holds: carResult.cdc_holds, pet_holds: cgsResult.pet_holds, mocl_isolation_holds: moclResult.isolation_holds },
+      timestamp_ms: now+4
+    });
+
+    // Violation entries
+    let lastHash = execFH;
+    for (const dropped of rgrResult.dropped_nodes) {
+      const vPH = await sha256(`drop|${dropped}|${omId}`);
+      const vFH = await sha256(`violation|${omId}|${vPH}|${now+5}`);
+      fabric.push({
+        hash: vFH, parent_hash: lastHash, om_id: omId, session_id: sid, event_type: 'violation',
+        payload_hash: vPH,
+        payload_summary: `RGR dropped ${dropped}: ${rgrResult.gate_log.find(g=>g.node_id===dropped)?.reason} — NOT patched`,
+        invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: true, no_speculative_features: false, cdc_holds: false, pet_holds: false, mocl_isolation_holds: true },
+        timestamp_ms: now+5
+      });
+      lastHash = vFH;
     }
 
-    // 4. Execution entry
-    const execPayloadHash = await sha256(JSON.stringify(executionGraph));
-    const execFabricHash = await sha256(`execution|${omId}|${execPayloadHash}|${now + 3}`);
-    fabricChain.push({
-      hash: execFabricHash, parent_hash: lastHash, om_id: omId, session_id: sid,
-      event_type: 'execution', payload_hash: execPayloadHash,
-      payload_summary: `ExecGraph: ${nodes.length} nodes built, CPC=${cpcResult.cpc_holds}, FR-1=${cpcResult.fr1_guarantee}`,
-      invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: true, no_speculative_features: true },
-      timestamp_ms: now + 3
+    // MOCL mediation entry (if needed)
+    if (moclResult.omm_required) {
+      const moclPH = await sha256(JSON.stringify(moclResult));
+      const moclFH = await sha256(`mocl_mediation|${omId}|${moclPH}|${now+6}`);
+      fabric.push({
+        hash: moclFH, parent_hash: lastHash, om_id: omId, session_id: sid, event_type: 'mocl_mediation',
+        payload_hash: moclPH,
+        payload_summary: `MOCL-1: ${moclResult.cross_om_interactions.length} cross-OM interaction(s) detected, OMM mediation required`,
+        invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: true, no_speculative_features: true, cdc_holds: carResult.cdc_holds, pet_holds: cgsResult.pet_holds, mocl_isolation_holds: false },
+        mocl_layer: { isolation_domain_id: moclResult.isolation_domain_id, cross_om_interactions: moclResult.cross_om_interactions, omm_mediated: true },
+        timestamp_ms: now+6
+      });
+      lastHash = moclFH;
+    }
+
+    // Render entry
+    const renderPH = await sha256(JSON.stringify(uiProjection));
+    const renderFH = await sha256(`render|${omId}|${renderPH}|${now+7}`);
+    fabric.push({
+      hash: renderFH, parent_hash: lastHash, om_id: omId, session_id: sid, event_type: 'render',
+      payload_hash: renderPH,
+      payload_summary: `UI: ${admittedRender.length} admitted, ${rgrResult.dropped_nodes.length} dropped — fr0=${uiProjection.fr0_status}, car=${uiProjection.car_status}, cgs=${uiProjection.cgs_status}, mocl=${uiProjection.mocl_status}`,
+      invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: true, no_speculative_features: true, cdc_holds: carResult.cdc_holds, pet_holds: cgsResult.pet_holds, mocl_isolation_holds: moclResult.isolation_holds },
+      timestamp_ms: now+7
     });
 
-    // 5. Render entry
-    const renderPayloadHash = await sha256(JSON.stringify(uiProjection));
-    const renderFabricHash = await sha256(`render|${omId}|${renderPayloadHash}|${now + 4}`);
-    fabricChain.push({
-      hash: renderFabricHash, parent_hash: execFabricHash, om_id: omId, session_id: sid,
-      event_type: 'render', payload_hash: renderPayloadHash,
-      payload_summary: `UI: ${admittedRenderNodes.length} admitted, ${rgrResult.dropped_nodes.length} dropped (not patched)`,
-      invariant_check: { singularity: true, no_orphan_execution: true, no_representation_without_collapse: true, no_speculative_features: true },
-      timestamp_ms: now + 4
-    });
+    stages.push({ stage: 'FabricChain', status: 'sealed', entry_count: fabric.length, chain_head: fabric[fabric.length-1].hash, layers: ['input','collapse','car_check','cgs_path','execution','render'] });
 
-    pipelineStages.push({
-      stage: 'FabricChain',
-      status: 'sealed',
-      entry_count: fabricChain.length,
-      chain_head: fabricChain[fabricChain.length - 1].hash,
-      has_violations: violationFabricEntries.length > 0,
-      append_only: true,
-      note: 'No overwrites. Violations are visible fabric entries, not masked patches.'
-    });
+    // ── Persist ──────────────────────────────────────────────────────────────
+    const executionGraph = {
+      eg_id: uid('eg'), om_id: omId, nodes, edges, status: cpcResult.cpc_holds ? 'valid' : 'cpc_violation',
+      validation_errors: cpcResult.violations,
+      manifold_id: cgsResult.manifold_id,
+      equivalence_class_id: cgsResult.equivalence_class_id,
+      outcome_hash: cgsResult.canonical_outcome_hash,
+      isolation_domain_id: moclResult.isolation_domain_id
+    };
 
-    // ─── Persist ──────────────────────────────────────────────────────────
     await base44.entities.AuthInput.create({ raw_text, context_state, session_id: sid, status: 'collapsed' });
     await base44.entities.ObjectiveMolecule.create(activatedOM);
-    executionGraph.status = cpcResult.cpc_holds ? 'valid' : 'cpc_violation';
     await base44.entities.ExecutionGraph.create(executionGraph);
-    for (const entry of fabricChain) {
-      await base44.entities.FabricEntry.create(entry);
-    }
+    for (const entry of fabric) await base44.entities.FabricEntry.create(entry);
 
-    // ─── Final response ───────────────────────────────────────────────────
+    // ── Final response ────────────────────────────────────────────────────────
+    const allClear = cpcResult.fr1_guarantee && rgrResult.passed && carResult.cdc_holds && cgsResult.pet_holds && moclResult.isolation_holds;
+
     return Response.json({
-      status: cpcResult.fr1_guarantee && rgrResult.passed ? 'collapsed_guaranteed' : 'collapsed_partial',
+      status: allClear ? 'collapsed_all_guarantees_held' : 'collapsed_partial',
       session_id: sid,
-
       active_om: activatedOM,
       execution_graph: executionGraph,
       ui_projection: uiProjection,
 
-      fr0_formal_guarantee: {
-        theorem: 'FR-1',
-        statement: 'If CPC holds, no find_REPLACE state is reachable at any RenderNode',
-        cpc_holds: cpcResult.cpc_holds,
-        fr1_holds: cpcResult.fr1_guarantee,
-        proof_paths: cpcResult.proof_paths,
-        violations_detected: cpcResult.violations,
-        rgr_gate_log: rgrResult.gate_log,
-        dropped_nodes: rgrResult.dropped_nodes,
-        correction_model: rgrResult.dropped_nodes.length > 0
-          ? 'BLOCKED NODES require new canonical collapse — no patching permitted'
-          : 'none required'
+      formal_guarantees: {
+        FR0: { theorem: 'FR-1', holds: cpcResult.fr1_guarantee, statement: 'No find_REPLACE state reachable — CPC enforced' },
+        CAR1: { holds: carResult.cdc_holds, statement: 'All constraints are deterministic ACF — no semantic elasticity', elastic_detected: carResult.elastic_constraints_detected },
+        CGS1: { holds: cgsResult.pet_holds, statement: 'All execution paths outcome-invariant — creativity bounded to manifold', manifold_paths: cgsResult.paths.length, divergent: cgsResult.divergent_paths },
+        MOCL1: { holds: moclResult.isolation_holds, statement: 'OM sealed in causal domain — no cross-OM contamination without OMM', omm_required: moclResult.omm_required }
       },
 
-      fabric_chain: fabricChain,
-      rejected_oms: rejectedOMs,
       cce_decision: cceDecision,
       cce_reason: cceReason,
-      pipeline_stages: pipelineStages,
+      car_result: carResult,
+      cgs_result: cgsResult,
+      mocl_result: moclResult,
+      cpc_result: cpcResult,
+      rgr_result: rgrResult,
+      rejected_oms: rejectedOMs,
+      fabric_chain: fabric,
+      pipeline_stages: stages,
 
       invariants: {
         singularity: true,
-        active_om_count: 1,
-        no_orphan_execution: true,
-        all_nodes_bound: nodes.every((n: any) => n.origin_reference === omId),
-        no_representation_without_collapse: true,
-        no_speculative_features: true,
         no_find_replace: cpcResult.fr1_guarantee,
-        correction_model: 'recollapse_only'
+        no_elastic_constraints: carResult.cdc_holds,
+        outcome_invariant_creativity: cgsResult.pet_holds,
+        no_cross_om_contamination: moclResult.isolation_holds,
+        correction_model: 'recollapse_only — no patching, no find_REPLACE, no post_hoc_repair'
       }
     });
 

@@ -2,12 +2,10 @@
   "type": "object",
   "properties": {
     "eg_id": {
-      "type": "string",
-      "description": "Graph identifier"
+      "type": "string"
     },
     "om_id": {
-      "type": "string",
-      "description": "Bound ObjectiveMolecule \u2014 required"
+      "type": "string"
     },
     "nodes": {
       "type": "array",
@@ -36,8 +34,7 @@
             "type": "object"
           },
           "origin_reference": {
-            "type": "string",
-            "description": "MUST match om_id"
+            "type": "string"
           },
           "depends_on": {
             "type": "array",
@@ -46,8 +43,7 @@
             }
           }
         }
-      },
-      "description": "All allowed execution steps"
+      }
     },
     "edges": {
       "type": "array",
@@ -64,8 +60,7 @@
             "type": "string"
           }
         }
-      },
-      "description": "Directed execution dependencies"
+      }
     },
     "status": {
       "type": "string",
@@ -74,15 +69,32 @@
         "valid",
         "executing",
         "complete",
-        "pruned"
+        "pruned",
+        "cpc_violation",
+        "car_violation"
       ]
     },
     "validation_errors": {
       "type": "array",
       "items": {
         "type": "string"
-      },
-      "description": "Invariant violations detected"
+      }
+    },
+    "manifold_id": {
+      "type": "string",
+      "description": "CGS-1: execution manifold binding"
+    },
+    "equivalence_class_id": {
+      "type": "string",
+      "description": "CGS-1: path equivalence class"
+    },
+    "outcome_hash": {
+      "type": "string",
+      "description": "CGS-1: sealed outcome for PET comparison"
+    },
+    "isolation_domain_id": {
+      "type": "string",
+      "description": "MOCL-1: domain isolation binding"
     }
   },
   "required": [

@@ -2,20 +2,16 @@
   "type": "object",
   "properties": {
     "hash": {
-      "type": "string",
-      "description": "SHA-256 of this entry"
+      "type": "string"
     },
     "parent_hash": {
-      "type": "string",
-      "description": "Previous chain link \u2014 null for genesis"
+      "type": "string"
     },
     "om_id": {
-      "type": "string",
-      "description": "Bound ObjectiveMolecule"
+      "type": "string"
     },
     "session_id": {
-      "type": "string",
-      "description": "Execution session"
+      "type": "string"
     },
     "event_type": {
       "type": "string",
@@ -25,17 +21,17 @@
         "execution",
         "render",
         "rejection",
-        "violation"
-      ],
-      "description": "Fabric event classification"
+        "violation",
+        "car_check",
+        "cgs_path",
+        "mocl_mediation"
+      ]
     },
     "payload_hash": {
-      "type": "string",
-      "description": "Hash of associated payload"
+      "type": "string"
     },
     "payload_summary": {
-      "type": "string",
-      "description": "Human-readable summary of what happened"
+      "type": "string"
     },
     "invariant_check": {
       "type": "object",
@@ -51,13 +47,80 @@
         },
         "no_speculative_features": {
           "type": "boolean"
+        },
+        "cdc_holds": {
+          "type": "boolean",
+          "description": "CAR-1: Constraint Determinism Condition"
+        },
+        "pet_holds": {
+          "type": "boolean",
+          "description": "CGS-1: Path Equivalence Test"
+        },
+        "mocl_isolation_holds": {
+          "type": "boolean",
+          "description": "MOCL-1: no cross-OM contamination"
+        }
+      }
+    },
+    "car_layer": {
+      "type": "object",
+      "properties": {
+        "constraint_hash": {
+          "type": "string"
+        },
+        "determinism_score": {
+          "type": "number"
+        },
+        "allowed_state_set_hash": {
+          "type": "string"
+        },
+        "elastic_constraints_detected": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
-      "description": "Invariant state at this event"
+      "description": "CAR-1 fabric extension"
+    },
+    "cgs_layer": {
+      "type": "object",
+      "properties": {
+        "execution_path_hash": {
+          "type": "string"
+        },
+        "equivalence_class_id": {
+          "type": "string"
+        },
+        "outcome_hash": {
+          "type": "string"
+        },
+        "path_variance": {
+          "type": "number"
+        }
+      },
+      "description": "CGS-1 fabric extension"
+    },
+    "mocl_layer": {
+      "type": "object",
+      "properties": {
+        "isolation_domain_id": {
+          "type": "string"
+        },
+        "cross_om_interactions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "omm_mediated": {
+          "type": "boolean"
+        }
+      },
+      "description": "MOCL-1 fabric extension"
     },
     "timestamp_ms": {
-      "type": "number",
-      "description": "Unix ms timestamp"
+      "type": "number"
     }
   },
   "required": [

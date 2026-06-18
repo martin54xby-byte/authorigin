@@ -745,6 +745,12 @@
   .fabric-dot.render    { border-color: var(--green);   }
   .fabric-dot.violation { border-color: var(--red);     }
   .fabric-dot.mocl_mediation { border-color: var(--amber); }
+  .fabric-dot.tcl_check { border-color: #c084fc; }
+  .fabric-dot.drift_violation { border-color: var(--red); }
+  .fabric-dot.eel_policy { border-color: #34d399; }
+  .fabric-dot.eel_rejection { border-color: var(--red); }
+  .fabric-dot.shcl_check { border-color: #f472b6; }
+  .fabric-dot.shcl_freeze { border-color: var(--amber); }
 
   .fabric-line {
     flex: 1;
@@ -773,6 +779,12 @@
   .et-render    { background: var(--green-dim);  color: var(--green); }
   .et-violation { background: var(--red-dim);    color: var(--red); }
   .et-mocl_mediation { background: var(--amber-dim); color: var(--amber); }
+  .et-tcl_check { background: rgba(192,132,252,.15); color: #c084fc; }
+  .et-drift_violation { background: var(--red-dim); color: var(--red); }
+  .et-eel_policy { background: rgba(52,211,153,.15); color: #34d399; }
+  .et-eel_rejection { background: var(--red-dim); color: var(--red); }
+  .et-shcl_check { background: rgba(244,114,182,.15); color: #f472b6; }
+  .et-shcl_freeze { background: var(--amber-dim); color: var(--amber); }
 
   .fabric-summary { font-size: 12px; color: var(--text-mid); line-height: 1.5; }
 
@@ -822,7 +834,7 @@
 
   .gs-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(4, 1fr);
     gap: 0;
   }
 
@@ -831,8 +843,8 @@
     border-right: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
   }
-  .gs-cell:nth-child(3n) { border-right: none; }
-  .gs-cell:nth-last-child(-n+3) { border-bottom: none; }
+  .gs-cell:nth-child(4n) { border-right: none; }
+  .gs-cell:nth-last-child(-n+4) { border-bottom: none; }
 
   .gs-layer { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 4px; }
   .gs-holds { font-size: 20px; font-weight: 900; margin-bottom: 4px; }
@@ -938,15 +950,25 @@
           <span class="stage-name">TCL-1 Temporal</span>
           <span class="stage-tag text-dim mono" style="font-size:9px">07</span>
         </div>
+        <div class="stage-item" data-stage="eel1">
+          <div class="stage-dot" id="dot-eel1"></div>
+          <span class="stage-name">EEL-1 Evolution</span>
+          <span class="stage-tag text-dim mono" style="font-size:9px">08</span>
+        </div>
+        <div class="stage-item" data-stage="shcl1">
+          <div class="stage-dot" id="dot-shcl1"></div>
+          <span class="stage-name">SHCL-1 Coherence</span>
+          <span class="stage-tag text-dim mono" style="font-size:9px">09</span>
+        </div>
         <div class="stage-item" data-stage="ui">
           <div class="stage-dot" id="dot-ui"></div>
           <span class="stage-name">UI Materialisation</span>
-          <span class="stage-tag text-dim mono" style="font-size:9px">08</span>
+          <span class="stage-tag text-dim mono" style="font-size:9px">10</span>
         </div>
         <div class="stage-item" data-stage="fabric">
           <div class="stage-dot" id="dot-fabric"></div>
           <span class="stage-name">origin.fabric</span>
-          <span class="stage-tag text-dim mono" style="font-size:9px">09</span>
+          <span class="stage-tag text-dim mono" style="font-size:9px">11</span>
         </div>
         <div class="stage-item" data-stage="guarantees">
           <div class="stage-dot" id="dot-guarantees"></div>
@@ -985,6 +1007,16 @@
           <span class="g-label">TCL-1</span>
           <div class="g-bar-track"><div class="g-bar-fill" id="gbar-tcl1" style="background:#c084fc"></div></div>
           <span class="g-status pend" id="gstat-tcl1">—</span>
+        </div>
+        <div class="g-row">
+          <span class="g-label">EEL-1</span>
+          <div class="g-bar-track"><div class="g-bar-fill" id="gbar-eel1" style="background:#34d399"></div></div>
+          <span class="g-status pend" id="gstat-eel1">—</span>
+        </div>
+        <div class="g-row">
+          <span class="g-label">SHCL-1</span>
+          <div class="g-bar-track"><div class="g-bar-fill" id="gbar-shcl1" style="background:#f472b6"></div></div>
+          <span class="g-status pend" id="gstat-shcl1">—</span>
         </div>
       </div>
     </div>
@@ -1087,8 +1119,8 @@ async function runPipeline() {
   // Reset UI
   const pipeline = document.getElementById('pipeline');
   pipeline.innerHTML = '';
-  ['authinput','opl','cce','car1','graph','cgs1','tcl1','ui','fabric','guarantees'].forEach(s => setDot(s, ''));
-  ['fr0','car1','cgs1','mocl','tcl1'].forEach(k => {
+  ['authinput','opl','cce','car1','graph','cgs1','tcl1','eel1','shcl1','ui','fabric','guarantees'].forEach(s => setDot(s, ''));
+  ['fr0','car1','cgs1','mocl','tcl1','eel1','shcl1'].forEach(k => {
     const bar = document.getElementById('gbar-' + k);
     const stat = document.getElementById('gstat-' + k);
     if (bar) { bar.style.width = '0%'; }
@@ -1134,6 +1166,14 @@ async function runPipeline() {
     appendCard('cce', renderBlocked(data));
     btn.disabled = false; btn.textContent = 'Collapse →';
     return;
+  }
+
+  if (data.status === 'blocked_coherence_failure') {
+    const oplSt2 = data.pipeline_stages?.find(s => s.stage === 'OPL');
+    setDot('opl', 'done'); appendCard('opl', renderOPL(oplSt2?.candidates || [], null));
+    setDot('cce', 'done'); appendCard('cce', renderCCE(data));
+    setDot('shcl1', 'error'); appendCard('shcl1', renderSHCL1Blocked(data));
+    btn.disabled = false; btn.textContent = 'Collapse →'; return;
   }
 
   if (data.status === 'blocked_temporal_drift') {
@@ -1188,6 +1228,18 @@ async function runPipeline() {
   setDot('tcl1', data.tcl_result?.tci_holds ? 'done' : 'error');
   appendCard('tcl1', renderTCL1(data.tcl_result, tclStage));
   if (data.formal_guarantees?.TCL1) setGuarantee('tcl1', data.formal_guarantees.TCL1.holds);
+
+  // EEL-1
+  const eelStage = data.pipeline_stages?.find(s => s.stage === 'EEL1_EpistemicEvolution');
+  setDot('eel1', data.eel_result?.eel_valid !== false ? 'done' : 'error');
+  appendCard('eel1', renderEEL1(data.eel_result, eelStage));
+  if (data.formal_guarantees?.EEL1) setGuarantee('eel1', data.formal_guarantees.EEL1.holds);
+
+  // SHCL-1
+  const shclStage = data.pipeline_stages?.find(s => s.stage === 'SHCL1_SystemCoherence');
+  setDot('shcl1', data.shcl_result?.sci_holds !== false ? 'done' : 'blocked');
+  appendCard('shcl1', renderSHCL1(data.shcl_result, shclStage));
+  if (data.formal_guarantees?.SHCL1) setGuarantee('shcl1', data.formal_guarantees.SHCL1.holds);
 
   // UI Materialisation
   setDot('ui', 'done');
@@ -1817,29 +1869,65 @@ function renderTCL1Blocked(data) {
   </div>`;
 }
 
+
+function renderEEL1(eel, stage) {
+  if (!eel) return '<div class="stage-card"><div class="card-body"><span class="text-dim">EEL-1 data not available</span></div></div>';
+  const ok = eel.eel_valid !== false;
+  const focus = eel.active_policy?.strategy?.optimisation_focus || 'cost';
+  const fc = {latency:'var(--blue)',throughput:'var(--green)',cost:'var(--accent)',reliability:'var(--amber)'}[focus]||'var(--text-mid)';
+  const allowedList = (eel.allowed_mutations||[]).map(m=>`<li style="color:var(--green);font-size:11px;margin:3px 0">&#10003; ${esc(m)}</li>`).join('');
+  const forbiddenList = (eel.forbidden_mutations||[]).map(m=>`<li style="color:var(--red);font-size:11px;margin:3px 0">&#10007; ${esc(m)}</li>`).join('');
+  const strategy = eel.active_policy?.strategy || {};
+  const metrics = (eel.active_policy?.performance_metrics||[]).map(m=>`<div style="background:var(--surface);border:1px solid var(--border-hi);border-radius:5px;padding:8px 10px;text-align:center"><div style="font-size:10px;color:var(--text-dim);margin-bottom:2px">${esc(m.metric)}</div><div style="font-size:16px;font-weight:700;font-family:var(--mono);color:var(--text)">${m.value}</div><div style="font-size:9px;color:var(--text-dim)">${esc(m.unit||'')} ${m.direction==='lower_is_better'?'&#8595;':'&#8593;'}</div></div>`).join('');
+  const priorBlock = eel.prior_policy ? `<div style="background:var(--surface2);border:1px solid var(--border-hi);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:11px"><span style="color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-size:9px">Superseded Policy</span><div style="margin-top:4px;color:var(--text-mid)">v${eel.prior_policy.version||0} &mdash; ${esc(eel.prior_policy.strategy?.approach||'&mdash;')} (${esc(eel.prior_policy.strategy?.optimisation_focus||'&mdash;')})</div></div>` : '';
+  const nodeOrder = strategy.node_ordering?.length ? `<div style="margin-bottom:8px"><span style="font-size:10px;color:var(--text-dim);font-weight:700;text-transform:uppercase">Node Order</span><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${strategy.node_ordering.map(n=>`<span style="font-family:var(--mono);font-size:10px;background:var(--border);padding:2px 6px;border-radius:3px;color:var(--text-mid)">${esc(n)}</span>`).join('<span style="color:var(--text-dim);margin:0 2px">&rarr;</span>')}</div></div>` : '';
+  const pruned = strategy.pruned_paths?.length ? `<div><span style="font-size:10px;color:var(--text-dim);font-weight:700;text-transform:uppercase">Pruned Paths</span><div style="margin-top:4px">${strategy.pruned_paths.map(p=>`<span style="font-family:var(--mono);font-size:10px;background:var(--red-dim);color:var(--red);padding:2px 6px;border-radius:3px;margin-right:4px">${esc(p)}</span>`).join('')}</div></div>` : '';
+  return `<div class="stage-card ${ok?'done':'error'}"><div class="card-header"><div class="card-icon ${ok?'icon-green':'icon-red'}" style="font-size:16px">&#9672;</div><div><div class="card-title">EEL-1 &mdash; Epistemic Evolution Layer</div><div class="card-subtitle">Meaning frozen. Strategy evolvable. Outcome invariant.</div></div><div class="card-status-badge ${ok?'sb-done':'sb-error'}">PM v${eel.policy_version||1} ${ok?'Active':'Rejected'}</div></div><div class="card-body"><div class="meta-row" style="margin-bottom:16px"><div class="meta-item"><span class="meta-key">Policy Version</span><span class="meta-val mono">v${eel.policy_version||1}</span></div><div class="meta-item"><span class="meta-key">Learning Source</span><span class="meta-val">${esc(eel.learning_source||'&mdash;')}</span></div><div class="meta-item"><span class="meta-key">Efficiency &Delta;</span><span class="meta-val mono ${(eel.efficiency_delta||0)<0?'text-green':(eel.efficiency_delta||0)>0?'text-red':'text-dim'}">${(eel.efficiency_delta||0)>0?'+':''}${eel.efficiency_delta||0}</span></div><div class="meta-item"><span class="meta-key">Outcome Invariant</span><span class="meta-val ${eel.outcome_invariant?'text-green':'text-red'}">${eel.outcome_invariant?'&#10003; holds':'&#10007; violated'}</span></div></div>${priorBlock}<div class="section-title">Active Strategy &mdash; PM v${eel.policy_version||1}</div><div style="background:var(--surface2);border:1px solid var(--border-hi);border-radius:8px;padding:14px;margin-bottom:16px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:12px;font-weight:600;flex:1">${esc(strategy.approach||'&mdash;')}</span><span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;border:1px solid ${fc};color:${fc}">${esc(focus)}</span></div>${nodeOrder}${pruned}</div>${metrics?`<div class="section-title">Performance Metrics</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-bottom:16px">${metrics}</div>`:''}<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div><div class="section-title">Allowed Mutations</div><ul style="list-style:none;padding:0">${allowedList}</ul></div><div><div class="section-title">Frozen (Forbidden)</div><ul style="list-style:none;padding:0">${forbiddenList}</ul></div></div>${(eel.violations||[]).length?`<div style="background:var(--red-dim);border:1px solid var(--red);border-radius:6px;padding:10px 12px;margin-top:12px;font-size:11px;color:var(--red)">${eel.violations.map(v=>`<div>&#9888; ${esc(v)}</div>`).join('')}</div>`:''}<div style="margin-top:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border-hi);border-radius:6px;font-size:10px;color:var(--text-dim)"><strong style="color:var(--text-mid)">EEL-1 invariant:</strong> PM_v(n+1) valid iff outcome(n+1) == outcome(n) AND cost(n+1) &lt; cost(n)</div></div></div>`;
+}
+
+function renderSHCL1(shcl, stage) {
+  if (!shcl) return '<div class="stage-card"><div class="card-body"><span class="text-dim">SHCL-1 data not available</span></div></div>';
+  const ok = shcl.sci_holds !== false;
+  const dvMag = shcl.dv_magnitude || 0;
+  const score = shcl.global_coherence_score || 0;
+  const scoreColor = score>=0.9?'var(--green)':score>=0.7?'var(--amber)':'var(--red)';
+  const dv = shcl.drift_vector || {};
+  const dvDims = [{key:'om_execution_mismatch',label:'OM&#8596;ExecGraph'},{key:'constraint_execution_mismatch',label:'CAR&#8596;ExecGraph'},{key:'policy_outcome_mismatch',label:'EEL&#8596;CGS'},{key:'temporal_fabric_mismatch',label:'TCL&#8596;Fabric'},{key:'cross_layer_interference',label:'MOCL Isolation'}];
+  const dvBars = dvDims.map(d=>{const val=dv[d.key]||0;const pct=Math.min(100,val*100);return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:10px;color:var(--text-dim);width:140px;flex-shrink:0">${d.label}</span><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:${val>0?'var(--red)':'var(--green)'};border-radius:3px"></div></div><span style="font-family:var(--mono);font-size:10px;width:32px;text-align:right;color:${val>0?'var(--red)':'var(--green)'}">${val.toFixed(2)}</span></div>`;}).join('');
+  const la = shcl.layer_agreement || {};
+  const laChips = Object.entries(la).map(([k,v])=>`<span class="inv-chip ${v?'ok':'err'}">${esc(k)}</span>`).join('');
+  const scg = shcl.scg_snapshot || {};
+  const scgRows = [['OM',scg.om?.om_id?.slice(0,14)+'&hellip;'||'&mdash;',esc(scg.om?.singular_goal?.slice(0,48)||'&mdash;')],['Constraints',`CDC=${scg.constraints?.cdc_holds}`,`${scg.constraints?.count||0} constraints`],['ExecGraph',`${scg.execution_graph?.node_count||0} nodes`,`${scg.execution_graph?.edge_count||0} edges`],['Policy',`PM v${scg.policy_molecule?.version||1}`,esc(scg.policy_molecule?.optimisation_focus||'&mdash;')],['Temporal',`v${scg.temporal_chain?.version||1}`,`TCI=${scg.temporal_chain?.tci_holds}`],['MOCL',`isolated=${scg.mocl?.isolation_holds}`,`cross-OM: ${scg.mocl?.cross_om_interactions||0}`]].map(([l,a,b])=>`<tr style="border-bottom:1px solid var(--border)"><td style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--text-dim);text-transform:uppercase">${l}</td><td style="padding:5px 8px;font-family:var(--mono);font-size:10px;color:var(--accent)">${a}</td><td style="padding:5px 8px;font-size:11px;color:var(--text-mid)">${b}</td></tr>`).join('');
+  return `<div class="stage-card ${ok?'done':'blocked'}"><div class="card-header"><div class="card-icon ${ok?'icon-green':'icon-amber'}" style="font-size:14px">&#8859;</div><div><div class="card-title">SHCL-1 &mdash; Self-Healing Consistency Layer</div><div class="card-subtitle">System Coherence Graph &middot; Drift Vector &middot; Re-Collapse Protocol</div></div><div class="card-status-badge ${ok?'sb-done':'sb-blocked'}">${ok?`Coherent (${Math.round(score*100)}%)`:`Repair (DV=${dvMag.toFixed(3)})`}</div></div><div class="card-body"><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px"><div style="background:var(--surface2);border:1px solid var(--border-hi);border-radius:8px;padding:12px;text-align:center"><div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Global Coherence</div><div style="font-size:28px;font-weight:900;color:${scoreColor}">${Math.round(score*100)}%</div><div style="font-size:10px;color:var(--text-dim)">layer agreement</div></div><div style="background:var(--surface2);border:1px solid var(--border-hi);border-radius:8px;padding:12px;text-align:center"><div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">DV Magnitude</div><div style="font-size:28px;font-weight:900;font-family:var(--mono);color:${dvMag>0.5?'var(--red)':'var(--green)'}">${dvMag.toFixed(3)}</div><div style="font-size:10px;color:var(--text-dim)">threshold: 0.500</div></div><div style="background:var(--surface2);border:1px solid var(--border-hi);border-radius:8px;padding:12px;text-align:center"><div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">FIC-1</div><div style="font-size:28px;font-weight:900;color:${shcl.fic_valid?'var(--green)':'var(--red)'}">${shcl.fic_valid?'&#10003;':'&#10007;'}</div><div style="font-size:10px;color:var(--text-dim)">fabric integrity</div></div></div><div class="section-title">Drift Vector &mdash; Per-Layer Inconsistency</div><div style="background:var(--surface2);border:1px solid var(--border-hi);border-radius:8px;padding:14px;margin-bottom:16px">${dvBars}</div><div class="section-title">Layer Agreement</div><div class="invariant-chips" style="margin-bottom:16px">${laChips}</div>${(shcl.inconsistencies||[]).length?`<div class="section-title">Inconsistencies</div><div style="background:var(--amber-dim);border:1px solid var(--amber);border-radius:6px;padding:12px;margin-bottom:16px">${shcl.inconsistencies.map(i=>`<div style="font-size:11px;color:var(--amber);margin-bottom:4px">&#9888; ${esc(i)}</div>`).join('')}</div>`:`<div style="background:var(--green-dim);border:1px solid var(--green);border-radius:6px;padding:10px 12px;margin-bottom:16px;font-size:12px;color:var(--green)">&#10003; No inter-layer inconsistencies detected</div>`}${shcl.repair_triggered?`<div class="section-title">Re-Collapse Protocol</div><div style="background:var(--red-dim);border:1px solid var(--red);border-radius:6px;padding:12px;margin-bottom:16px;font-size:12px;color:var(--red)"><strong>Repair triggered &mdash; no local fix permitted.</strong><span style="color:var(--text-mid);margin-top:6px;display:block">${esc(shcl.repair_protocol||'')}</span></div>`:''}<div class="section-title">System Coherence Graph (SCG) Snapshot</div><div style="background:var(--surface2);border:1px solid var(--border-hi);border-radius:8px;overflow:hidden;margin-bottom:12px"><table style="width:100%;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border)"><th style="padding:6px 8px;font-size:10px;color:var(--text-dim);text-align:left">Layer</th><th style="padding:6px 8px;font-size:10px;color:var(--text-dim);text-align:left">ID / Hash</th><th style="padding:6px 8px;font-size:10px;color:var(--text-dim);text-align:left">Status</th></tr></thead><tbody>${scgRows}</tbody></table></div><div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-bottom:12px">SCG hash: <span style="color:var(--accent)">${esc(shcl.scg_hash||'').slice(0,32)}&hellip;</span></div><div style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border-hi);border-radius:6px;font-size:10px;color:var(--text-dim)"><strong style="color:var(--text-mid)">SCI-1:</strong> &forall; SCG: consistency(OM, CAR, CGS, EEL, TCL, MOCL) == true<br><strong style="color:var(--text-mid)">Repair rule:</strong> No local repair &mdash; all repair is global, collapse-based, graph-recomputed<br><strong style="color:var(--text-mid)">Truth model:</strong> System truth is not maintained &mdash; continuously re-derived from immutable lineage</div></div></div>`;
+}
+
+function renderSHCL1Blocked(data) {
+  const shcl = data.shcl_result || {};
+  return `<div class="stage-card error"><div class="card-header"><div class="card-icon icon-red" style="font-size:14px">&#8859;</div><div><div class="card-title">SHCL-1 &mdash; Coherence Failure Blocked</div><div class="card-subtitle">DV &gt; 1.2 &mdash; Re-Collapse Protocol required</div></div><div class="card-status-badge sb-error">DV=${(shcl.dv_magnitude||0).toFixed(3)}</div></div><div class="card-body"><div class="block-panel"><div class="block-title">&#8859; System coherence failure (DV=${(shcl.dv_magnitude||0).toFixed(3)} &gt; 1.2)</div><div class="block-msg">${esc(data.message||'Inter-layer inconsistency. No local repair permitted.')}</div>${(shcl.inconsistencies||[]).length?`<div style="margin-top:10px">${shcl.inconsistencies.map(i=>`<div style="font-size:11px;color:var(--amber);margin-top:4px">&#9888; ${esc(i)}</div>`).join('')}</div>`:''}<div class="block-question">${esc(data.resolution||'Submit a fresh request to re-derive from canonical lineage')}</div></div></div></div>`;
+}
+
 function renderGuarantees(fg) {
   if (!fg) return '';
 
   const layers = [
-    { key: 'FR0',  name: 'FR-0', color: 'var(--green)',  bg: 'var(--green-dim)', subtitle: 'Anti-find_REPLACE' },
-    { key: 'CAR1', name: 'CAR-1', color: 'var(--accent)', bg: 'var(--accent-dim)', subtitle: 'Constraint Determinism' },
-    { key: 'CGS1', name: 'CGS-1', color: 'var(--blue)',   bg: 'var(--blue-dim)',   subtitle: 'Outcome Invariance' },
-    { key: 'MOCL1',name: 'MOCL-1',color: 'var(--amber)',  bg: 'var(--amber-dim)',  subtitle: 'OM Isolation' },
-    { key: 'TCL1', name: 'TCL-1', color: '#c084fc',       bg: 'rgba(192,132,252,.15)', subtitle: 'Temporal Coherence' },
+    { key: 'FR0',   name: 'FR-0',   color: 'var(--green)',  subtitle: 'Anti-find_REPLACE' },
+    { key: 'CAR1',  name: 'CAR-1',  color: 'var(--accent)', subtitle: 'Constraint Determinism' },
+    { key: 'CGS1',  name: 'CGS-1',  color: 'var(--blue)',   subtitle: 'Outcome Invariance' },
+    { key: 'MOCL1', name: 'MOCL-1', color: 'var(--amber)',  subtitle: 'OM Isolation' },
+    { key: 'TCL1',  name: 'TCL-1',  color: '#c084fc',       subtitle: 'Temporal Coherence' },
+    { key: 'EEL1',  name: 'EEL-1',  color: '#34d399',       subtitle: 'Epistemic Evolution' },
+    { key: 'SHCL1', name: 'SHCL-1', color: '#f472b6',       subtitle: 'Self-Healing Coherence' },
   ];
 
   const cells = layers.map(l => {
-    const g = fg[l.key] || {};
-    const holds = g.holds;
-    return `
-    <div class="gs-cell">
-      <div class="gs-layer" style="color:${l.color}">${l.name} — ${l.subtitle}</div>
-      <div class="gs-holds ${holds ? 'yes' : 'no'}">${holds ? '✓' : '✗'}</div>
-      <div class="gs-stmt">${esc(g.statement || '—')}</div>
-      ${g.elastic?.length ? `<div style="font-size:10px;color:var(--red);margin-top:4px">Elastic: ${g.elastic.join(', ')}</div>` : ''}
-      ${g.divergent?.length ? `<div style="font-size:10px;color:var(--red);margin-top:4px">Divergent paths: ${g.divergent.join(', ')}</div>` : ''}
-      ${g.omm_required ? `<div style="font-size:10px;color:var(--amber);margin-top:4px">OMM mediation required</div>` : ''}
-    </div>`;
+    const g = fg[l.key] || {}, holds = g.holds;
+    let extra = '';
+    if (g.elastic?.length) extra += `<div style="font-size:10px;color:var(--red);margin-top:4px">Elastic: ${g.elastic.join(', ')}</div>`;
+    if (g.omm_required) extra += `<div style="font-size:10px;color:var(--amber);margin-top:4px">OMM mediation required</div>`;
+    if (g.policy_version) extra += `<div style="font-size:10px;color:var(--text-dim);margin-top:4px">PM v${g.policy_version} · Δ=${g.efficiency_delta||0}</div>`;
+    if (g.dv_magnitude !== undefined) extra += `<div style="font-size:10px;color:${g.dv_magnitude>0.5?'var(--red)':'var(--green)'};margin-top:4px">DV=${g.dv_magnitude?.toFixed(3)} · ${Math.round((g.global_coherence_score||0)*100)}% coherent</div>`;
+    if (g.repair_triggered) extra += `<div style="font-size:10px;color:var(--red);margin-top:4px">⚠ Repair triggered</div>`;
+    return `<div class="gs-cell"><div class="gs-layer" style="color:${l.color}">${l.name} — ${l.subtitle}</div><div class="gs-holds ${holds?'yes':'no'}">${holds?'✓':'✗'}</div><div class="gs-stmt">${esc(g.statement||'—')}</div>${extra}</div>`;
   }).join('');
 
   const allHold = layers.every(l => fg[l.key]?.holds);

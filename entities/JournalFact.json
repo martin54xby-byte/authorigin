@@ -1,0 +1,215 @@
+{
+  "type": "object",
+  "properties": {
+    "fact_id": {
+      "type": "string",
+      "description": "Stable unique identity for this fact \u2014 immutable"
+    },
+    "molecule_id": {
+      "type": "string",
+      "description": "The molecule this fact concerns"
+    },
+    "canonicalHash": {
+      "type": "string",
+      "description": "Molecule payload hash at time of fact production"
+    },
+    "fact_type": {
+      "type": "string",
+      "enum": [
+        "molecule_created",
+        "survived_challenge",
+        "governance_approved",
+        "governance_rejected",
+        "state_transition",
+        "superseded",
+        "contextualised",
+        "deprecated",
+        "rejected",
+        "domain_endorsed",
+        "domain_trust_updated",
+        "lineage_conflict_confirmed",
+        "constitutional_violation_recorded",
+        "lineage_declared",
+        "constitutional_snapshot",
+        "training_manifest_recorded",
+        "inference_provenance_recorded",
+        "classification_event",
+        "foundational_designation",
+        "payment_event",
+        "escrow_created",
+        "escrow_released",
+        "clawback_initiated"
+      ],
+      "description": "Constitutional fact type \u2014 facts change constitutional reality, observations do not"
+    },
+    "weight_class": {
+      "type": "string",
+      "enum": [
+        "constitutional",
+        "operational"
+      ],
+      "description": "Constitutional facts carry full authority; operational facts are configurable within constitutional bounds"
+    },
+    "polarity": {
+      "type": "integer",
+      "enum": [
+        1,
+        0,
+        -1
+      ],
+      "description": "Signal direction: +1 positive, 0 neutral, -1 negative"
+    },
+    "from_state": {
+      "type": "string",
+      "enum": [
+        "CREATED",
+        "EXPLORED",
+        "COLLAPSING",
+        "UNDER_GOVERNANCE",
+        "VERIFIED_WEAK",
+        "VERIFIED_STRONG",
+        "MATERIALISED",
+        "REINFORCED",
+        "SUPERSEDED",
+        "CONTEXTUAL",
+        "DEPRECATED",
+        "REJECTED"
+      ],
+      "description": "Prior molecule state before this fact \u2014 null if no state transition"
+    },
+    "to_state": {
+      "type": "string",
+      "enum": [
+        "CREATED",
+        "EXPLORED",
+        "COLLAPSING",
+        "UNDER_GOVERNANCE",
+        "VERIFIED_WEAK",
+        "VERIFIED_STRONG",
+        "MATERIALISED",
+        "REINFORCED",
+        "SUPERSEDED",
+        "CONTEXTUAL",
+        "DEPRECATED",
+        "REJECTED"
+      ],
+      "description": "New molecule state after this fact \u2014 null if no state transition"
+    },
+    "governance_ref_id": {
+      "type": "string",
+      "description": "governance_id of the JournalGovernanceRecord that authorised this fact"
+    },
+    "observation_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "observation_ids that informed the governance decision producing this fact"
+    },
+    "challenge_id": {
+      "type": "string",
+      "description": "If challenge-related \u2014 the challenge this fact resolves or records"
+    },
+    "challenge_quality_score": {
+      "type": "number",
+      "description": "For survived_challenge \u2014 C-9 quality score: trust(0.40)+evidence(0.30)+novelty(0.20)+history(0.10)"
+    },
+    "survival_type": {
+      "type": "string",
+      "enum": [
+        "intact",
+        "refined",
+        "strengthened"
+      ],
+      "description": "For survived_challenge \u2014 how the molecule survived"
+    },
+    "successor_id": {
+      "type": "string",
+      "description": "For superseded facts \u2014 molecule_id of the successor"
+    },
+    "scope_definition": {
+      "type": "string",
+      "description": "For contextualised facts \u2014 explicit boundary declaration"
+    },
+    "actor_id": {
+      "type": "string",
+      "description": "Who or what produced this fact"
+    },
+    "actor_domain_id": {
+      "type": "string",
+      "description": "Which trust domain the actor belongs to"
+    },
+    "actor_trust_score": {
+      "type": "number",
+      "description": "Snapshot of actor trust at time of fact \u2014 frozen forever, prevents retroactive manipulation"
+    },
+    "quorum_domains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "For multi-domain governance facts \u2014 domain_ids that formed the quorum"
+    },
+    "triage_tier": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "description": "For classification_event facts \u2014 triage tier assigned"
+    },
+    "payment_amount": {
+      "type": "number",
+      "description": "For payment facts \u2014 total payment amount"
+    },
+    "payment_currency": {
+      "type": "string",
+      "description": "For payment facts \u2014 currency"
+    },
+    "payment_model": {
+      "type": "string",
+      "enum": [
+        "retrieval",
+        "outcome",
+        "training_contribution"
+      ],
+      "description": "For payment facts \u2014 which payment model generated this"
+    },
+    "governance_reserve_amount": {
+      "type": "number",
+      "description": "For payment facts \u2014 12% reserve deducted per C-23"
+    },
+    "escrow_amount": {
+      "type": "number",
+      "description": "For escrow facts \u2014 amount held pending challenge resolution per C-21"
+    },
+    "evidence_hash": {
+      "type": "string",
+      "description": "Hash of supporting evidence"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Fact-specific structured data"
+    },
+    "constitution_version": {
+      "type": "string",
+      "description": "Constitution version under which this fact was produced \u2014 v1.0"
+    },
+    "journal_sequence": {
+      "type": "integer",
+      "description": "Monotonically increasing \u2014 no gaps permitted"
+    },
+    "fact_hash": {
+      "type": "string",
+      "description": "Hash of this fact content chained with prior entry hash \u2014 integrity chain"
+    },
+    "prior_entry_hash": {
+      "type": "string",
+      "description": "Hash of the immediately preceding journal entry"
+    }
+  },
+  "required": [],
+  "name": "JournalFact"
+}

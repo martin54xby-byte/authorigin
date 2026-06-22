@@ -1,0 +1,255 @@
+{
+  "type": "object",
+  "properties": {
+    "molecule_id": {
+      "type": "string",
+      "description": "Stable unique identity \u2014 never changes, even if content changes"
+    },
+    "canonicalHash": {
+      "type": "string",
+      "description": "SHA-256 hash of content payload \u2014 content identity, not molecule identity"
+    },
+    "molecule_type": {
+      "type": "string",
+      "enum": [
+        "claim",
+        "evidence",
+        "reasoning",
+        "context",
+        "conclusion",
+        "container",
+        "semantic_governance",
+        "constitutional_snapshot",
+        "llm_response"
+      ],
+      "description": "Constitutional molecule type determining challenge surface and governance tier"
+    },
+    "current_state": {
+      "type": "string",
+      "enum": [
+        "CREATED",
+        "EXPLORED",
+        "COLLAPSING",
+        "UNDER_GOVERNANCE",
+        "VERIFIED_WEAK",
+        "VERIFIED_STRONG",
+        "MATERIALISED",
+        "REINFORCED",
+        "SUPERSEDED",
+        "CONTEXTUAL",
+        "DEPRECATED",
+        "REJECTED"
+      ],
+      "description": "Current CER state machine position"
+    },
+    "constitutional_status": {
+      "type": "string",
+      "enum": [
+        "COMPLIANT",
+        "FLAGGED",
+        "SUSPENDED"
+      ],
+      "description": "Constitutional compliance status"
+    },
+    "access_tier": {
+      "type": "string",
+      "enum": [
+        "PUBLIC",
+        "REGISTERED_EXTERNAL",
+        "INTERNAL_GENERAL",
+        "INTERNAL_GOVERNANCE",
+        "SOVEREIGN"
+      ],
+      "description": "Access control tier per AccessConstitution"
+    },
+    "weight_class": {
+      "type": "string",
+      "enum": [
+        "constitutional",
+        "operational"
+      ],
+      "description": "Whether this molecule is governed by constitutional or operational rules"
+    },
+    "is_foundational": {
+      "type": "boolean",
+      "description": "Foundational molecules propagate NOTED challenge pressure indefinitely regardless of depth"
+    },
+    "kCv_o": {
+      "type": "number",
+      "description": "Originality dimension score (0.0-1.0) \u2014 observation-derived"
+    },
+    "kCv_u": {
+      "type": "number",
+      "description": "Utility dimension score (0.0-1.0) \u2014 observation-derived"
+    },
+    "kCv_v_score": {
+      "type": "number",
+      "description": "Verification dimension score (0.0-1.0) \u2014 fact-derived"
+    },
+    "kCv_v_quality": {
+      "type": "string",
+      "enum": [
+        "WEAK",
+        "STRONG"
+      ],
+      "description": "Verification quality \u2014 WEAK (approved, no challenge) or STRONG (survived challenge)"
+    },
+    "kCv_i_score": {
+      "type": "number",
+      "description": "Impact dimension score (0.0-1.0) \u2014 fact-derived"
+    },
+    "kCv_i_status": {
+      "type": "string",
+      "enum": [
+        "PROVISIONAL",
+        "WEAKENED",
+        "NOTED",
+        "ACTIVE"
+      ],
+      "description": "Impact score propagation status"
+    },
+    "kCv_r_score": {
+      "type": "number",
+      "description": "Resilience dimension score (0.0-1.0) \u2014 fact-derived"
+    },
+    "kCv_r_status": {
+      "type": "string",
+      "enum": [
+        "PROVISIONAL",
+        "WEAKENED",
+        "NOTED",
+        "ACTIVE"
+      ],
+      "description": "Resilience score propagation status"
+    },
+    "kCv_rank": {
+      "type": "number",
+      "description": "kCvRank \u2014 lineage authority score computed from survival history of ancestors"
+    },
+    "capture_confidence": {
+      "type": "string",
+      "enum": [
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+        "UNKNOWN"
+      ],
+      "description": "Estimated completeness of evidence capture \u2014 not a score, a provenance quality indicator"
+    },
+    "evidence_gap_flag": {
+      "type": "boolean",
+      "description": "True if molecule has high utility but sparse observation evidence \u2014 C-12 protection applies"
+    },
+    "observation_density": {
+      "type": "number",
+      "description": "Observations per unit time, normalised \u2014 signals whether evidence capture is active"
+    },
+    "reuse_count": {
+      "type": "integer",
+      "description": "Number of distinct citing molecules \u2014 tracked for C-6 mandatory review threshold"
+    },
+    "active_challenge_id": {
+      "type": "string",
+      "description": "Challenge ID if molecule is currently COLLAPSING or UNDER_GOVERNANCE"
+    },
+    "propagation_status": {
+      "type": "string",
+      "enum": [
+        "PROVISIONAL",
+        "WEAKENED",
+        "NOTED",
+        "CLEAR"
+      ],
+      "description": "Current lineage pressure propagation status inherited from ancestors"
+    },
+    "propagation_depth": {
+      "type": "integer",
+      "description": "Depth from the challenged ancestor producing current propagation status"
+    },
+    "propagation_source_molecule_id": {
+      "type": "string",
+      "description": "molecule_id of the ancestor whose challenge is propagating to this molecule"
+    },
+    "damping_factor": {
+      "type": "number",
+      "description": "Domain-level damping factor (0.4-0.8, default 0.6 per Constitution v1.0)"
+    },
+    "parent_molecule_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Direct lineage parents \u2014 molecule_ids this molecule depends on"
+    },
+    "lineage_types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "direct_inheritance",
+          "primary_citation",
+          "decision_reference",
+          "secondary_citation",
+          "tangential_mention"
+        ]
+      },
+      "description": "Parallel array to parent_molecule_ids \u2014 relationship type for each parent"
+    },
+    "lineage_certainty": {
+      "type": "string",
+      "enum": [
+        "CONFIRMED",
+        "PROBABLE",
+        "INFERRED",
+        "UNKNOWN"
+      ],
+      "description": "Certainty of lineage reconstruction \u2014 C-14 applies to INFERRED and UNKNOWN"
+    },
+    "successor_molecule_id": {
+      "type": "string",
+      "description": "If SUPERSEDED, the molecule_id that supersedes this one"
+    },
+    "scope_definition": {
+      "type": "string",
+      "description": "If CONTEXTUAL, the explicit boundary within which this molecule is valid"
+    },
+    "constitution_version": {
+      "type": "string",
+      "description": "Constitution version under which this molecule was created \u2014 v1.0"
+    },
+    "author_domain_id": {
+      "type": "string",
+      "description": "The domain that created and is authoritative for this molecule"
+    },
+    "vsid": {
+      "type": "string",
+      "description": "VectorSafeID \u2014 authorigin:mol:{molecule_id}:{canonicalHash_prefix}"
+    },
+    "embedding_model_id": {
+      "type": "string",
+      "description": "Which embedding model produced the vector for this molecule"
+    },
+    "embedding_timestamp": {
+      "type": "string",
+      "description": "When this molecule was embedded into the vector store"
+    },
+    "last_fact_id": {
+      "type": "string",
+      "description": "fact_id of the most recent JournalFact affecting this molecule"
+    },
+    "last_observation_id": {
+      "type": "string",
+      "description": "observation_id of the most recent JournalObservation for this molecule"
+    },
+    "state_since": {
+      "type": "string",
+      "description": "ISO timestamp when molecule entered its current state"
+    },
+    "mandatory_review_due": {
+      "type": "string",
+      "description": "ISO timestamp when C-6 mandatory review becomes constitutionally required"
+    }
+  },
+  "required": [],
+  "name": "Molecule"
+}

@@ -1,0 +1,86 @@
+{
+  "type": "object",
+  "properties": {
+    "integrity_id": {
+      "type": "string",
+      "description": "Stable unique identity for this integrity record"
+    },
+    "covered_through_sequence": {
+      "type": "integer",
+      "description": "journal_sequence this snapshot covers \u2014 all entries up to and including this sequence"
+    },
+    "constitutional_hash": {
+      "type": "string",
+      "description": "Hash of all active constitutional facts at this snapshot point \u2014 represents current reality, not history"
+    },
+    "active_fact_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The fact_ids that compose constitutional reality at this snapshot \u2014 enables verification without replaying full history"
+    },
+    "prior_event_hash": {
+      "type": "string",
+      "description": "Last event hash before this integrity snapshot \u2014 anchors snapshot in the event chain"
+    },
+    "event_chain_valid": {
+      "type": "boolean",
+      "description": "Whether the event chain from genesis to this point has been verified"
+    },
+    "observation_count_since_last": {
+      "type": "integer",
+      "description": "Number of JournalObservations since prior integrity record"
+    },
+    "fact_count_since_last": {
+      "type": "integer",
+      "description": "Number of JournalFacts since prior integrity record"
+    },
+    "governance_count_since_last": {
+      "type": "integer",
+      "description": "Number of JournalGovernanceRecords since prior integrity record"
+    },
+    "molecule_count_active": {
+      "type": "integer",
+      "description": "Total molecules in non-terminal states at snapshot time"
+    },
+    "molecule_count_total": {
+      "type": "integer",
+      "description": "Total molecules ever created at snapshot time"
+    },
+    "generated_by": {
+      "type": "string",
+      "description": "Governance authority that produced this snapshot \u2014 snapshots are governance facts not infrastructure artifacts"
+    },
+    "generated_by_domain": {
+      "type": "string",
+      "description": "Domain of the governance authority"
+    },
+    "generated_by_trust_score": {
+      "type": "number",
+      "description": "Snapshot of generator trust at time of record"
+    },
+    "gcpc_at_snapshot": {
+      "type": "number",
+      "description": "Governance Cost Per Contribution at snapshot time \u2014 constitutional health metric"
+    },
+    "ecpc_at_snapshot": {
+      "type": "number",
+      "description": "Evidence Cost Per Contribution at snapshot time \u2014 constitutional health metric"
+    },
+    "vrpc_at_snapshot": {
+      "type": "number",
+      "description": "Value Returned Per Contribution at snapshot time \u2014 constitutional health metric"
+    },
+    "constitution_version": {
+      "type": "string",
+      "description": "Constitution version operative at snapshot time"
+    },
+    "integrity_hash": {
+      "type": "string",
+      "description": "Hash of this integrity record \u2014 self-verifying"
+    }
+  },
+  "required": [],
+  "name": "JournalIntegrityRecord"
+}

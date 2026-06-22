@@ -1,0 +1,120 @@
+{
+  "type": "object",
+  "properties": {
+    "domain_id": {
+      "type": "string",
+      "description": "Stable unique identity for this trust domain"
+    },
+    "domain_name": {
+      "type": "string",
+      "description": "Human-readable domain name"
+    },
+    "domain_type": {
+      "type": "string",
+      "enum": [
+        "organisation",
+        "individual",
+        "system",
+        "regulatory",
+        "founding"
+      ],
+      "description": "Type of domain"
+    },
+    "trust_score": {
+      "type": "number",
+      "description": "Current domain trust score (0.1 floor per C-4, emerges from survival history)"
+    },
+    "trust_score_updated": {
+      "type": "string",
+      "description": "ISO timestamp of last trust score update"
+    },
+    "constitutional_floor": {
+      "type": "number",
+      "default": 0.1,
+      "description": "Minimum trust score \u2014 0.1 per C-4, cannot be zero"
+    },
+    "challenge_history_score": {
+      "type": "number",
+      "description": "Fraction of this domain's raised challenges that were upheld \u2014 C-9 input"
+    },
+    "challenges_raised": {
+      "type": "integer",
+      "description": "Total challenges raised by this domain"
+    },
+    "challenges_upheld": {
+      "type": "integer",
+      "description": "Challenges raised by this domain that were upheld (molecule survived)"
+    },
+    "challenges_rejected": {
+      "type": "integer",
+      "description": "Challenges raised by this domain that were rejected (challenge accepted, molecule failed)"
+    },
+    "molecules_contributed": {
+      "type": "integer",
+      "description": "Total molecules created by this domain"
+    },
+    "molecules_verified_strong": {
+      "type": "integer",
+      "description": "Molecules from this domain that have reached VERIFIED_STRONG"
+    },
+    "molecules_reinforced": {
+      "type": "integer",
+      "description": "Molecules from this domain that have reached REINFORCED"
+    },
+    "survived_challenge_count": {
+      "type": "integer",
+      "description": "Total survived_challenge facts in this domain's molecule lineage"
+    },
+    "endorsed_by_domains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "domain_ids that have endorsed this domain \u2014 C-4 trust graph edges"
+    },
+    "endorses_domains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "domain_ids this domain has endorsed"
+    },
+    "damping_factor": {
+      "type": "number",
+      "description": "This domain's kCvRank damping factor (0.4-0.8, default 0.6 per Constitution v1.0)"
+    },
+    "access_tier_granted": {
+      "type": "string",
+      "enum": [
+        "PUBLIC",
+        "REGISTERED_EXTERNAL",
+        "INTERNAL_GENERAL",
+        "INTERNAL_GOVERNANCE",
+        "SOVEREIGN"
+      ],
+      "description": "Maximum access tier this domain is authorised for"
+    },
+    "registration_date": {
+      "type": "string",
+      "description": "ISO timestamp of domain registration"
+    },
+    "last_activity_date": {
+      "type": "string",
+      "description": "ISO timestamp of last governance or contribution activity \u2014 inactivity triggers trust decay"
+    },
+    "inactivity_decay_due": {
+      "type": "string",
+      "description": "ISO timestamp when trust decay activates if no activity recorded"
+    },
+    "constitution_version": {
+      "type": "string",
+      "description": "Constitution version under which this domain was registered"
+    },
+    "founding_fact_id": {
+      "type": "string",
+      "description": "fact_id of the domain_endorsed or molecule_created fact that instantiated this domain in the journal"
+    }
+  },
+  "required": [],
+  "name": "Domain"
+}

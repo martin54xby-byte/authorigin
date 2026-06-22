@@ -1,0 +1,154 @@
+{
+  "type": "object",
+  "properties": {
+    "governance_id": {
+      "type": "string",
+      "description": "Stable unique identity for this governance record"
+    },
+    "molecule_id": {
+      "type": "string",
+      "description": "The molecule under governance"
+    },
+    "governance_type": {
+      "type": "string",
+      "enum": [
+        "challenge_raised",
+        "challenge_under_review",
+        "challenge_resolved",
+        "governance_review_initiated",
+        "mandatory_review_initiated",
+        "resolution_contested",
+        "quorum_convened",
+        "quorum_resolved"
+      ],
+      "description": "Type of governance process \u2014 process records, not state changes"
+    },
+    "challenge_type": {
+      "type": "string",
+      "enum": [
+        "factual",
+        "semantic",
+        "governance",
+        "lineage",
+        "ethical"
+      ],
+      "description": "For challenge records \u2014 nature of the challenge"
+    },
+    "challenge_status": {
+      "type": "string",
+      "enum": [
+        "OPEN",
+        "UNDER_REVIEW",
+        "RESOLVED"
+      ],
+      "description": "Current status of this governance process"
+    },
+    "resolution": {
+      "type": "string",
+      "enum": [
+        "upheld",
+        "partially_upheld",
+        "rejected"
+      ],
+      "description": "Resolution outcome \u2014 null if still open. upheld=challenge rejected, molecule survives. rejected=challenge accepted."
+    },
+    "challenge_quality_score": {
+      "type": "number",
+      "description": "C-9 computed quality score: challenger_trust(0.40)+evidence_depth(0.30)+novelty(0.20)+history(0.10)"
+    },
+    "challenger_trust_score": {
+      "type": "number",
+      "description": "C-9 input: challenger domain trust score at time of challenge (0.0-1.0)"
+    },
+    "challenge_evidence_depth": {
+      "type": "number",
+      "description": "C-9 input: depth and specificity of evidence payload (0.0-1.0)"
+    },
+    "challenge_novelty": {
+      "type": "number",
+      "description": "C-9 input: how novel this challenge type is for this molecule (0.0-1.0)"
+    },
+    "challenger_challenge_history": {
+      "type": "number",
+      "description": "C-9 input: fraction of this challenger's prior challenges that were upheld (0.0-1.0)"
+    },
+    "observation_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "observation_ids that informed this governance action"
+    },
+    "actor_id": {
+      "type": "string",
+      "description": "Governance authority actor"
+    },
+    "actor_domain_id": {
+      "type": "string",
+      "description": "Governance authority domain"
+    },
+    "actor_trust_score": {
+      "type": "number",
+      "description": "Snapshot of governance actor trust at time of record"
+    },
+    "challenger_id": {
+      "type": "string",
+      "description": "For challenge records \u2014 who raised the challenge"
+    },
+    "challenger_domain_id": {
+      "type": "string",
+      "description": "For challenge records \u2014 which domain raised the challenge"
+    },
+    "quorum_domains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "domain_ids forming the governance quorum for this decision"
+    },
+    "quorum_threshold": {
+      "type": "integer",
+      "description": "Minimum quorum size required for this governance tier"
+    },
+    "evidence_payload_hash": {
+      "type": "string",
+      "description": "Hash of the challenge evidence payload"
+    },
+    "resolution_rationale": {
+      "type": "string",
+      "description": "Human-readable governance rationale for the resolution"
+    },
+    "resulting_fact_id": {
+      "type": "string",
+      "description": "fact_id of the JournalFact this governance record produced \u2014 null if still open"
+    },
+    "escalation_tier": {
+      "type": "integer",
+      "enum": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "description": "Governance tier per C-10: 0=autonomous, 1=threshold-triggered, 2=human required, 3=constitutional quorum"
+    },
+    "constitution_version": {
+      "type": "string",
+      "description": "Constitution version operative at time of governance record"
+    },
+    "journal_sequence": {
+      "type": "integer",
+      "description": "Monotonically increasing \u2014 no gaps permitted"
+    },
+    "governance_hash": {
+      "type": "string",
+      "description": "Hash of this record chained with prior entry hash"
+    },
+    "prior_entry_hash": {
+      "type": "string",
+      "description": "Hash of the immediately preceding journal entry"
+    }
+  },
+  "required": [],
+  "name": "JournalGovernanceRecord"
+}

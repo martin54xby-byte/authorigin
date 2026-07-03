@@ -1,0 +1,52 @@
+{
+  "type": "object",
+  "properties": {
+    "runtime_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "batch_id": {
+      "type": "string"
+    },
+    "parent_runtime": {
+      "type": "string"
+    },
+    "pipeline_version": {
+      "type": "string"
+    },
+    "canonicalisation_version": {
+      "type": "string"
+    },
+    "trust_version": {
+      "type": "string"
+    },
+    "started": {
+      "type": "string"
+    },
+    "finished": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "running",
+        "completed",
+        "skipped_duplicate",
+        "failed"
+      ]
+    },
+    "source_name": {
+      "type": "string"
+    },
+    "resulting_molecule_id": {
+      "type": "string"
+    }
+  },
+  "required": [],
+  "name": "RuntimeContext"
+}

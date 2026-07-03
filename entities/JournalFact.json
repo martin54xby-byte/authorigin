@@ -208,6 +208,10 @@
     "prior_entry_hash": {
       "type": "string",
       "description": "Hash of the immediately preceding journal entry"
+    },
+    "runtime_id": {
+      "type": "string",
+      "description": "For molecule_created \u2014 which Origin Runtime execution produced this fact, linking the constitutional birth event back to its execution trace"
     }
   },
   "required": [],

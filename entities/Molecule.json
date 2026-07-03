@@ -165,6 +165,10 @@
     },
     "mandatory_review_due": {
       "type": "string"
+    },
+    "runtime_id": {
+      "type": "string",
+      "description": "The Origin Runtime execution that created this molecule \u2014 not just who signed it, but which deterministic run produced it. Enables full replay of construction."
     }
   },
   "required": [],

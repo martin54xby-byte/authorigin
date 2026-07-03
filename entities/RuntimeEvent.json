@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "properties": {
+    "runtime_id": {
+      "type": "string",
+      "description": "The unit-level Runtime Context this event belongs to"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "received",
+        "normalised"
+      ]
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "payload_digest": {
+      "type": "string"
+    },
+    "next_stage": {
+      "type": "string"
+    }
+  },
+  "required": [],
+  "name": "RuntimeEvent"
+}

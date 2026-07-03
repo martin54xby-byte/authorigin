@@ -9,7 +9,7 @@
     },
     "lexical_content": {
       "type": "string",
-      "description": "The actual text content of this molecule \u2014 the retrievable knowledge surface"
+      "description": "The actual text content of this molecule \u2014 the retrievable knowledge surface. For edge molecules, a human-readable description of the relationship."
     },
     "molecule_type": {
       "type": "string",
@@ -21,9 +21,10 @@
         "observation",
         "definition",
         "example",
-        "knowledge_document"
+        "knowledge_document",
+        "edge"
       ],
-      "description": "Constitutional molecule type governing verifiability and kCv weighting"
+      "description": "Constitutional molecule type. 'edge' denotes a Relationship Molecule."
     },
     "current_state": {
       "type": "string"
@@ -115,8 +116,7 @@
           "constrains",
           "references"
         ]
-      },
-      "description": "Provenance relationship type to each parent \u2014 fractal lineage"
+      }
     },
     "lineage_certainty": {
       "type": "string"
@@ -128,16 +128,13 @@
       "type": "string"
     },
     "section": {
-      "type": "string",
-      "description": "Source document section heading"
+      "type": "string"
     },
     "source_name": {
-      "type": "string",
-      "description": "Source document identifier \u2014 HOL provenance anchor"
+      "type": "string"
     },
     "hol_context": {
-      "type": "string",
-      "description": "Human-Origin Layer context: decision pressure, intent, author note"
+      "type": "string"
     },
     "constitution_version": {
       "type": "string"
@@ -167,8 +164,43 @@
       "type": "string"
     },
     "runtime_id": {
+      "type": "string"
+    },
+    "edge_source_molecule_id": {
+      "type": "string"
+    },
+    "edge_target_molecule_id": {
+      "type": "string"
+    },
+    "edge_relationship_type": {
       "type": "string",
-      "description": "The Origin Runtime execution that created this molecule \u2014 not just who signed it, but which deterministic run produced it. Enables full replay of construction."
+      "enum": [
+        "DERIVES_FROM",
+        "SUPPORTS",
+        "CONTRADICTS",
+        "CITES",
+        "SUMMARISES",
+        "IMPLEMENTS",
+        "REPLACES",
+        "SUPERSEDES"
+      ]
+    },
+    "edge_confidence": {
+      "type": "number"
+    },
+    "edge_evidence_summary": {
+      "type": "string"
+    },
+    "edge_algorithm_version": {
+      "type": "string"
+    },
+    "edge_created_by": {
+      "type": "string",
+      "enum": [
+        "deterministic_extraction",
+        "ai_suggestion",
+        "human_declared"
+      ]
     }
   },
   "required": [],

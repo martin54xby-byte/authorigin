@@ -28,9 +28,10 @@
         "noted_inherited",
         "evidence_gap_observed",
         "retrieval_event",
-        "retrieval_outcome_event"
+        "retrieval_outcome_event",
+        "pipeline_stage_completed"
       ],
-      "description": "Classification of observation \u2014 observations do not change constitutional reality"
+      "description": "Classification of observation \u2014 observations do not change constitutional reality. pipeline_stage_completed is a Molecule Event: post-identity runtime execution telemetry, distinct from epistemic signals."
     },
     "polarity": {
       "type": "integer",
@@ -149,6 +150,14 @@
     "constitution_version": {
       "type": "string",
       "description": "Constitution version operative at time of observation \u2014 v1.0"
+    },
+    "runtime_id": {
+      "type": "string",
+      "description": "For pipeline_stage_completed \u2014 which Origin Runtime execution produced this event, post-identity"
+    },
+    "stage_name": {
+      "type": "string",
+      "description": "For pipeline_stage_completed \u2014 which of the 9 lifecycle stages this event records (canonicalised, classified, linked, validated, trust_scored, registered, searchable)"
     }
   },
   "required": [],

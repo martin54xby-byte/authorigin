@@ -521,6 +521,164 @@ async function simulateClassification(payload, base44) {
   };
 }
 
+
+// ── DETERMINISTIC EDGE PARSER -- Phase 1 (ACS-300 §7) ───────────────────────
+// Scope: regex/structural extraction only. No embeddings, no LLMs, no semantic
+// inference. Relationship types: CITES, REFERENCES_STANDARD, DERIVES_FROM,
+// IMPLEMENTS. SUPPORTS / CONTRADICTS deliberately NOT enabled.
+const EDGE_ALGORITHM_VERSION = "edge-parser-1.0.0";
+
+const STANDARD_REGEX_SRC = "\\b(ASHRAE\\s\\d+(?:\\.\\d+)?|CIBSE\\s+Guide\\s+[A-Z]|CIBSE\\s+TM\\d+|TM\\d+|BS\\s?EN\\s?\\d+|BS\\s\\d+|ISO\\s?\\d+|Part\\s+[A-Z])\\b";
+const CITATION_REGEX_SRC = "\\b(?:see|refer to)\\s+(?:figure\\s+\\d+\\s+of\\s+)?([A-Z][A-Za-z0-9\\s\\-]{2,80}?)(?=[.,;]|$)";
+const DERIVATION_REGEX_SRC = "\\b(?:calculated using|derived from)\\s+(?:the\\s+)?([A-Za-z0-9\\-\\s]{3,60}?)(?=[.,;]|$)";
+const IMPLEMENTS_REGEX_SRC = "\\bimplemented\\s+according\\s+to\\s+([A-Za-z0-9\\-\\s]{3,60}?)(?=[.,;]|$)";
+
+function narrowToKnownCode(capturedText) {
+  // Deterministic post-processing: if the captured span contains a known
+  // standard-code pattern, narrow to that exact code rather than the whole
+  // trailing clause. Reuses STANDARD_REGEX_SRC -- no new heuristics introduced.
+  const inner = new RegExp(STANDARD_REGEX_SRC, "");
+  const found = inner.exec(capturedText);
+  return found ? found[1].replace(/\s+/g, " ").trim() : capturedText;
+}
+
+function extractCandidates(text) {
+  const candidates = [];
+  const sentenceOf = (idx) => {
+    const before = text.lastIndexOf(".", idx);
+    const after = text.indexOf(".", idx);
+    return text.substring(before === -1 ? 0 : before + 1, after === -1 ? text.length : after + 1).trim();
+  };
+  let m;
+  const std = new RegExp(STANDARD_REGEX_SRC, "g");
+  while ((m = std.exec(text)) !== null) candidates.push({ relationship_type: "REFERENCES_STANDARD", target_text: m[1].replace(/\s+/g, " ").trim(), confidence: 1.0, evidence_summary: sentenceOf(m.index) });
+  const cit = new RegExp(CITATION_REGEX_SRC, "gi");
+  while ((m = cit.exec(text)) !== null) candidates.push({ relationship_type: "CITES", target_text: narrowToKnownCode(m[1].replace(/\s+/g, " ").trim()), confidence: 1.0, evidence_summary: sentenceOf(m.index) });
+  const der = new RegExp(DERIVATION_REGEX_SRC, "gi");
+  while ((m = der.exec(text)) !== null) candidates.push({ relationship_type: "DERIVES_FROM", target_text: narrowToKnownCode(m[1].replace(/\s+/g, " ").trim()), confidence: 0.9, evidence_summary: sentenceOf(m.index) });
+  const impl = new RegExp(IMPLEMENTS_REGEX_SRC, "gi");
+  while ((m = impl.exec(text)) !== null) candidates.push({ relationship_type: "IMPLEMENTS", target_text: narrowToKnownCode(m[1].replace(/\s+/g, " ").trim()), confidence: 0.9, evidence_summary: sentenceOf(m.index) });
+  return candidates;
+}
+
+function normaliseForResolution(s) {
+  return s.toLowerCase().replace(/[_\-]/g, " ").replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+}
+function resolveTarget(targetText, allMolecules) {
+  const norm = normaliseForResolution(targetText);
+  const match = allMolecules.find(m => m.molecule_type !== "edge" && m.source_name && normaliseForResolution(m.source_name) === norm);
+  return match ? match.molecule_id : null;
+}
+
+function verifyEdgeCandidate(sourceId, targetId, candidate) {
+  if (sourceId === targetId) return { ok: false, reason: "self_reference" };
+  if (!["CITES", "REFERENCES_STANDARD", "DERIVES_FROM", "IMPLEMENTS"].includes(candidate.relationship_type)) return { ok: false, reason: "relationship_type_not_in_phase1_scope" };
+  if (candidate.confidence < 0 || candidate.confidence > 1) return { ok: false, reason: "confidence_out_of_range" };
+  if (!candidate.evidence_summary || candidate.evidence_summary.length < 3) return { ok: false, reason: "insufficient_evidence" };
+  return { ok: true };
+}
+
+async function generateEdgesForMolecule(sourceMoleculeId, candidates, allMolecules, base44, runtime_id, actor_id) {
+  const result = { edges_created: [], unresolved: [], duplicates_skipped: [] };
+  const existingEdgeHashes = new Set(allMolecules.filter(m => m.molecule_type === "edge").map(m => m.canonicalHash));
+
+  const allObs = await base44.asServiceRole.entities.JournalObservation.list();
+  let ls = Math.max(0, ...allObs.map(o => o.journal_sequence || 0));
+  let priorHash = allObs.length > 0 ? (allObs[allObs.length - 1].observation_hash || "genesis") : "genesis";
+
+  for (const cand of candidates) {
+    const targetId = resolveTarget(cand.target_text, allMolecules);
+
+    if (!targetId) {
+      ls += 1;
+      const oid = gid("obs-unresolved", sourceMoleculeId, cand.target_text, now());
+      const obsHash = sha256(oid + cand.target_text + now());
+      await base44.asServiceRole.entities.JournalObservation.create({
+        observation_id: oid, molecule_id: sourceMoleculeId, observation_type: "evidence_gap_observed",
+        gap_type: "lineage", polarity: 0, conflict_flag: false, actor_id, actor_domain_id: "edge-parser",
+        actor_trust_score: 1.0, evidence_hash: sha256(cand.target_text), constitution_version: "v1.1",
+        journal_sequence: ls, observation_hash: obsHash, prior_entry_hash: priorHash,
+        metadata: { unresolved_target_text: cand.target_text, attempted_relationship_type: cand.relationship_type, evidence_summary: cand.evidence_summary },
+      });
+      priorHash = obsHash;
+      result.unresolved.push({ target_text: cand.target_text, relationship_type: cand.relationship_type, reason: "target_not_found_in_corpus" });
+      continue;
+    }
+
+    const v = verifyEdgeCandidate(sourceMoleculeId, targetId, cand);
+    if (!v.ok) { result.unresolved.push({ target_text: cand.target_text, relationship_type: cand.relationship_type, reason: v.reason }); continue; }
+
+    const edgeHash = sha256(sourceMoleculeId + targetId + cand.relationship_type + cand.evidence_summary);
+    if (existingEdgeHashes.has(edgeHash)) { result.duplicates_skipped.push({ target_text: cand.target_text, relationship_type: cand.relationship_type }); continue; }
+
+    const edgeMoleculeId = "mol-edge-" + edgeHash.substring(0, 16);
+    await base44.asServiceRole.entities.Molecule.create({
+      molecule_id: edgeMoleculeId, canonicalHash: edgeHash, lexical_content: `${cand.relationship_type}: ${cand.evidence_summary}`,
+      molecule_type: "edge", current_state: "EXPLORED", constitutional_status: "active", access_tier: "open",
+      weight_class: "operational", is_foundational: false,
+      kCv_o: 0, kCv_u: 0, kCv_v_score: 0, kCv_v_quality: "UNVERIFIED", kCv_i_score: 0, kCv_i_status: "UNOBSERVED",
+      kCv_r_score: 0, kCv_r_status: "NEW", kCv_rank: 0, capture_confidence: String(cand.confidence),
+      observation_density: 0, reuse_count: 0, parent_molecule_ids: [sourceMoleculeId], lineage_types: [],
+      lineage_certainty: String(cand.confidence), scope_definition: "edge::" + cand.relationship_type,
+      constitution_version: "v1.1", state_since: now(), runtime_id,
+      edge_source_molecule_id: sourceMoleculeId, edge_target_molecule_id: targetId,
+      edge_relationship_type: cand.relationship_type, edge_confidence: cand.confidence,
+      edge_evidence_summary: cand.evidence_summary, edge_algorithm_version: EDGE_ALGORITHM_VERSION,
+      edge_created_by: "deterministic_extraction", vsid: actor_id, author_domain_id: "edge-parser",
+    });
+
+    const allFacts = await base44.asServiceRole.entities.JournalFact.list();
+    const fls = Math.max(0, ...allFacts.map(f => f.journal_sequence || 0));
+    await base44.asServiceRole.entities.JournalFact.create({
+      fact_id: gid("fact-edge", edgeMoleculeId, now()), molecule_id: edgeMoleculeId, canonicalHash: edgeHash,
+      fact_type: "molecule_created", from_state: "CREATED", to_state: "EXPLORED", weight_class: "operational",
+      polarity: 1, actor_id, actor_domain_id: "edge-parser", actor_trust_score: 1.0, evidence_hash: edgeHash,
+      constitution_version: "v1.1", journal_sequence: fls + 1,
+      fact_hash: sha256(edgeMoleculeId + now()), prior_entry_hash: allFacts.length > 0 ? (allFacts[allFacts.length - 1].fact_hash || "genesis") : "genesis",
+      runtime_id,
+    });
+
+    existingEdgeHashes.add(edgeHash);
+    result.edges_created.push({ molecule_id: edgeMoleculeId, source: sourceMoleculeId, target: targetId, relationship_type: cand.relationship_type, confidence: cand.confidence, evidence_summary: cand.evidence_summary });
+  }
+  return result;
+}
+
+async function extractEdges(payload, base44) {
+  const { molecule_id, source_name, runtime_id = "manual-extraction", actor_id = "edge-parser" } = payload;
+  const allMolecules = await base44.asServiceRole.entities.Molecule.list();
+
+  let targets = [];
+  if (molecule_id) {
+    const m = allMolecules.find(x => x.molecule_id === molecule_id);
+    if (!m) return { success: false, error: `Molecule ${molecule_id} not found` };
+    targets = [m];
+  } else if (source_name) {
+    targets = allMolecules.filter(m => m.source_name === source_name && m.molecule_type !== "container" && m.molecule_type !== "edge");
+  } else {
+    targets = allMolecules.filter(m => m.molecule_type !== "container" && m.molecule_type !== "edge" && m.lexical_content);
+  }
+
+  const summary = { molecules_scanned: targets.length, edges_created: [], unresolved: [], duplicates_skipped: [] };
+  for (const mol of targets) {
+    const candidates = extractCandidates(mol.lexical_content || "");
+    if (candidates.length === 0) continue;
+    const r = await generateEdgesForMolecule(mol.molecule_id, candidates, allMolecules, base44, runtime_id, actor_id);
+    summary.edges_created.push(...r.edges_created);
+    summary.unresolved.push(...r.unresolved);
+    summary.duplicates_skipped.push(...r.duplicates_skipped);
+  }
+
+  return {
+    success: true, algorithm_version: EDGE_ALGORITHM_VERSION,
+    molecules_scanned: summary.molecules_scanned,
+    edges_created_count: summary.edges_created.length,
+    unresolved_count: summary.unresolved.length,
+    duplicates_skipped_count: summary.duplicates_skipped.length,
+    edges_created: summary.edges_created, unresolved: summary.unresolved, duplicates_skipped: summary.duplicates_skipped,
+  };
+}
+
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
   const port = new Base44Adapter(base44);
@@ -536,8 +694,9 @@ Deno.serve(async (req) => {
     if (action === "record_reuse") return Response.json(await recordReuse(payload, base44));
     if (action === "get_corpus_summary") return Response.json(await getCorpusSummary(payload, base44));
     if (action === "simulate_classification") return Response.json(await simulateClassification(payload, base44));
+    if (action === "extract_edges") return Response.json(await extractEdges(payload, base44));
 
-    return Response.json({ error: "Unknown action: " + action, valid_actions: ["ingest_document", "get_runtime_trace", "search_molecules", "get_molecule_detail", "record_reuse", "get_corpus_summary", "simulate_classification"] }, { status: 400 });
+    return Response.json({ error: "Unknown action: " + action, valid_actions: ["ingest_document", "get_runtime_trace", "search_molecules", "get_molecule_detail", "record_reuse", "get_corpus_summary", "simulate_classification", "extract_edges"] }, { status: 400 });
   } catch (err) {
     return Response.json({ error: err.message }, { status: 500 });
   }
